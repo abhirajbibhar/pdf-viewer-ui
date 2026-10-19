@@ -1,0 +1,135 @@
+/* Theme tokens (copied from the original light / dark themes). */
+:root {
+  color-scheme: light;
+  --ep-background-app: #f3f4f6;
+  --ep-background-surface: #ffffff;
+  --ep-background-surface-alt: #f1f3f5;
+  --ep-background-elevated: #ffffff;
+  --ep-background-overlay: rgba(0, 0, 0, 0.5);
+  --ep-background-input: #ffffff;
+
+  --ep-foreground-primary: #111827;
+  --ep-foreground-secondary: #374151;
+  --ep-foreground-muted: #6b7280;
+  --ep-foreground-disabled: #9ca3af;
+  --ep-foreground-on-accent: #ffffff;
+
+  --ep-border-default: #d1d5db;
+  --ep-border-subtle: #e5e7eb;
+  --ep-border-strong: #9ca3af;
+
+  --ep-accent-primary: #3b82f6;
+  --ep-accent-primary-hover: #2563eb;
+  --ep-accent-primary-active: #1d4ed8;
+  --ep-accent-primary-light: #eff6ff;
+  --ep-accent-primary-foreground: #ffffff;
+
+  --ep-interactive-hover: #f3f4f6;
+  --ep-interactive-active: #e5e7eb;
+  --ep-interactive-selected: #eff6ff;
+  --ep-interactive-focus: #3b82f6;
+  --ep-interactive-focus-ring: #bfdbfe;
+
+  --ep-state-error: #ef4444;
+  --ep-state-error-light: #fef2f2;
+  --ep-state-warning: #f59e0b;
+  --ep-state-warning-light: #fffbeb;
+  --ep-state-success: #22c55e;
+  --ep-state-success-light: #f0fdf4;
+  --ep-state-info: #3b82f6;
+  --ep-state-info-light: #eff6ff;
+
+  --ep-tooltip-background: #111827;
+  --ep-tooltip-foreground: #ffffff;
+
+  --ep-scrollbar-track: #f3f4f6;
+  --ep-scrollbar-thumb: #d1d5db;
+  --ep-scrollbar-thumb-hover: #9ca3af;
+
+  --ep-font-family: 'Open Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+/* Follows the OS by default; set data-theme="light|dark" on <html> to force one. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --ep-background-app: #111827;
+    --ep-background-surface: #1f2937;
+    --ep-background-surface-alt: #374151;
+    --ep-background-elevated: #1f2937;
+    --ep-background-overlay: rgba(0, 0, 0, 0.7);
+    --ep-background-input: #374151;
+    --ep-foreground-primary: #f9fafb;
+    --ep-foreground-secondary: #e5e7eb;
+    --ep-foreground-muted: #9ca3af;
+    --ep-foreground-disabled: #6b7280;
+    --ep-foreground-on-accent: #111827;
+    --ep-border-default: #4b5563;
+    --ep-border-subtle: #374151;
+    --ep-border-strong: #6b7280;
+    --ep-accent-primary: #60a5fa;
+    --ep-accent-primary-hover: #3b82f6;
+    --ep-accent-primary-active: #2563eb;
+    --ep-accent-primary-light: #1e3a5f;
+    --ep-accent-primary-foreground: #111827;
+    --ep-interactive-hover: #374151;
+    --ep-interactive-active: #4b5563;
+    --ep-interactive-selected: #1e3a5f;
+    --ep-interactive-focus: #60a5fa;
+    --ep-interactive-focus-ring: #1e40af;
+    --ep-state-error: #f87171;
+    --ep-state-error-light: #7f1d1d;
+    --ep-state-warning: #fbbf24;
+    --ep-state-warning-light: #78350f;
+    --ep-state-success: #4ade80;
+    --ep-state-success-light: #14532d;
+    --ep-state-info: #60a5fa;
+    --ep-state-info-light: #1e3a5f;
+    --ep-tooltip-background: #f9fafb;
+    --ep-tooltip-foreground: #111827;
+    --ep-scrollbar-track: #1f2937;
+    --ep-scrollbar-thumb: #4b5563;
+    --ep-scrollbar-thumb-hover: #6b7280;
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --ep-background-app: #111827;
+  --ep-background-surface: #1f2937;
+  --ep-background-surface-alt: #374151;
+  --ep-background-elevated: #1f2937;
+  --ep-background-overlay: rgba(0, 0, 0, 0.7);
+  --ep-background-input: #374151;
+  --ep-foreground-primary: #f9fafb;
+  --ep-foreground-secondary: #e5e7eb;
+  --ep-foreground-muted: #9ca3af;
+  --ep-foreground-disabled: #6b7280;
+  --ep-foreground-on-accent: #111827;
+  --ep-border-default: #4b5563;
+  --ep-border-subtle: #374151;
+  --ep-border-strong: #6b7280;
+  --ep-accent-primary: #60a5fa;
+  --ep-accent-primary-hover: #3b82f6;
+  --ep-accent-primary-active: #2563eb;
+  --ep-accent-primary-light: #1e3a5f;
+  --ep-accent-primary-foreground: #111827;
+  --ep-interactive-hover: #374151;
+  --ep-interactive-active: #4b5563;
+  --ep-interactive-selected: #1e3a5f;
+  --ep-interactive-focus: #60a5fa;
+  --ep-interactive-focus-ring: #1e40af;
+  --ep-state-error: #f87171;
+  --ep-state-error-light: #7f1d1d;
+  --ep-state-warning: #fbbf24;
+  --ep-state-warning-light: #78350f;
+  --ep-state-success: #4ade80;
+  --ep-state-success-light: #14532d;
+  --ep-state-info: #60a5fa;
+  --ep-state-info-light: #1e3a5f;
+  --ep-tooltip-background: #f9fafb;
+  --ep-tooltip-foreground: #111827;
+  --ep-scrollbar-track: #1f2937;
+  --ep-scrollbar-thumb: #4b5563;
+  --ep-scrollbar-thumb-hover: #6b7280;
+}
