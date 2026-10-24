@@ -382,3 +382,128 @@ button:disabled { cursor: default; }
 .ep-a-field.is-fill { border-style: solid; background: rgba(59, 130, 246, .12); cursor: auto; }
 .ep-a-field.is-fill input, .ep-a-field.is-fill select { pointer-events: auto; }
 .ep-a-text.is-selected, .ep-a-pin.is-selected, .ep-a-stamp.is-selected, .ep-a-signature.is-selected, .ep-a-image.is-selected, .ep-a-field.is-selected { outline: 1.5px dashed var(--ep-accent-primary); outline-offset: 2px; }
+
+/* ═════════ Mobile bottom drawer (replaces inline sidebars below 768px) ═════════
+   Port of EmbedPDF's <BottomDrawer>: slides up from the bottom, half / full snap points,
+   dimmed backdrop, drag handle. The shell is persistent (see components/drawer.ts). */
+.ep-drawer-layer { display: none; position: absolute; inset: 0; z-index: 45; pointer-events: none; }
+.ep-drawer-layer.is-visible { display: block; }
+
+.ep-drawer-backdrop {
+  position: absolute; inset: 0; z-index: 40;
+  background: var(--ep-background-overlay);
+  opacity: 0; pointer-events: none;
+  transition: opacity .3s ease-out;
+}
+.ep-drawer {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 50;
+  height: 0; max-height: 100%;
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--ep-background-surface);
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, .28);
+  transition: height .3s ease-out;
+  will-change: height;
+  pointer-events: auto;
+}
+.ep-drawer.is-dragging, .ep-drawer-backdrop.is-dragging { transition: none; }
+
+.ep-drawer-handle {
+  flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  padding: 12px 0; cursor: grab;
+  touch-action: none; user-select: none; -webkit-user-select: none;
+}
+.ep-drawer-handle:active { cursor: grabbing; }
+.ep-drawer-grip { width: 48px; height: 6px; border-radius: 9999px; background: var(--ep-border-default); }
+
+.ep-drawer-body {
+  flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+/* the regular sidebar markup, restyled to fill the sheet */
+.ep-sidebar.in-drawer { width: 100%; flex: 1; min-height: 0; border: 0; box-shadow: none; z-index: auto; background: transparent; }
+.ep-sidebar.in-drawer > * { min-height: 0; }
+.ep-sidebar.in-drawer > .ep-style { overflow-y: auto; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ep-drawer, .ep-drawer-backdrop { transition: none; }
+}
+
+/* ═════════ Mobile menu bottom sheet (document / page / zoom / mode menus below 768px) ═════════
+   Port of EmbedPDF's <MobileMenu>: wraps its content (max 80%), slides up, drag down to dismiss. */
+.ep-sheet-layer { display: none; position: absolute; inset: 0; z-index: 55; pointer-events: none; }
+.ep-sheet-layer.is-visible { display: block; }
+.ep-sheet-backdrop {
+  position: absolute; inset: 0; z-index: 40; pointer-events: auto;
+  background: var(--ep-background-overlay); opacity: 0; transition: opacity .3s ease-out;
+}
+.ep-menu-sheet {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 50; max-height: 80%;
+  display: flex; flex-direction: column; overflow: hidden; pointer-events: auto;
+  background: var(--ep-background-surface); border-radius: 16px 16px 0 0;
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, .28);
+  transform: translateY(100%); transition: transform .3s ease-out; will-change: transform;
+}
+.ep-menu-sheet.is-dragging { transition: none; }
+.ep-sheet-handle {
+  flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding: 12px 0;
+  cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;
+}
+.ep-sheet-handle:active { cursor: grabbing; }
+.ep-sheet-content { flex: 1; min-height: 0; display: flex; flex-direction: column; padding-bottom: env(safe-area-inset-bottom, 0px); }
+.ep-sheet-menu { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.ep-sheet-header { display: flex; align-items: center; gap: 12px; flex-shrink: 0; padding: 0 16px 12px; border-bottom: 1px solid var(--ep-border-subtle); }
+.ep-sheet-header h3 { margin: 0; font-size: 16px; font-weight: 600; color: var(--ep-foreground-primary); }
+.ep-sheet-back { display: flex; padding: 4px; border-radius: 9999px; color: var(--ep-foreground-secondary); }
+.ep-sheet-back:hover { background: var(--ep-interactive-hover); }
+.ep-sheet-items { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 0; }
+
+/* larger touch rows inside the sheet */
+.ep-sheet-items .ep-menu-item { gap: 12px; padding: 12px 16px; font-size: 16px; color: var(--ep-foreground-secondary); transition: background-color .15s; }
+.ep-sheet-items .ep-menu-item:hover { background: transparent; color: var(--ep-foreground-secondary); }
+.ep-sheet-items .ep-menu-item:active { background: var(--ep-interactive-active); }
+.ep-sheet-items .ep-menu-item.is-active { background: var(--ep-interactive-selected); color: var(--ep-accent-primary); }
+.ep-sheet-items .ep-menu-icon { width: 20px; height: 20px; }
+.ep-sheet-items .ep-menu-label { flex: 1; font-size: 16px; white-space: normal; }
+.ep-sheet-items .ep-menu-section { padding: 12px 16px; }
+
+.ep-drawer-handle.is-static { cursor: default; }
+@media (prefers-reduced-motion: reduce) { .ep-menu-sheet, .ep-sheet-backdrop { transition: none; } }
+
+/* ═════════ Remaining mobile polish ═════════ */
+/* Dialogs (print / protect / signature) are full-screen on mobile, centered cards on desktop – like EmbedPDF's <Dialog>. */
+.ep-root.is-mobile .ep-modal-backdrop { align-items: stretch; justify-content: stretch; background: var(--ep-background-surface); }
+.ep-root.is-mobile .ep-dialog { width: 100%; max-width: none; height: 100%; border: 0; border-radius: 0; box-shadow: none; }
+.ep-root.is-mobile .ep-dialog-content { flex: 1; max-height: none; }
+
+/* Notched phones: keep the top bar clear of the status bar / notch (the bottom inset is handled by the sheets). */
+#pdf-viewer { box-sizing: border-box; padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) 0 env(safe-area-inset-left, 0px); }
+
+/* Scrolling inside a sheet must not chain into the page behind it. */
+.ep-sheet-items, .ep-drawer .ep-sidebar-body, .ep-drawer .ep-comments, .ep-drawer .ep-search-results, .ep-drawer .ep-style { overscroll-behavior: contain; }
+
+/* Touch: with a drawing / pan / marquee tool active (or on an annotation) the finger draws instead of scrolling the page. */
+.tool-draw .ep-viewport, .tool-pan .ep-viewport, .tool-marquee .ep-viewport { touch-action: none; }
+.ep-ann-svg .ep-hit { touch-action: none; }
+
+/* ═════════ Comment replies (EmbedPDF's reply thread + "Add reply" field) ═════════ */
+.ep-card-body { display: block; }
+.ep-card-row { display: flex; align-items: flex-start; gap: 12px; }
+.ep-reply-list { display: flex; flex-direction: column; gap: 16px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--ep-border-subtle); }
+.ep-reply { display: flex; align-items: flex-start; gap: 12px; }
+.ep-reply .ep-card-author h5 { margin: 0; font-size: 14px; font-weight: 500; }
+.ep-reply .ep-card-author span { color: var(--ep-foreground-muted); }
+.ep-reply-form { display: flex; align-items: flex-end; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--ep-border-subtle); cursor: default; }
+.ep-reply-field {
+  flex: 1; min-width: 0; padding: 4px 12px; font: inherit; font-size: 16px; color: var(--ep-foreground-primary);
+  background: var(--ep-background-input); border: 1px solid var(--ep-border-default); border-radius: 8px; outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+.ep-reply-field::placeholder { color: var(--ep-foreground-muted); }
+.ep-reply-field:focus { border-color: transparent; box-shadow: 0 0 0 2px var(--ep-accent-primary); }
+.ep-reply-send {
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0; padding: 8px; border-radius: 8px;
+  background: var(--ep-accent-primary); color: var(--ep-foreground-on-accent); transition: background-color .15s;
+}
+.ep-reply-send:hover:not(:disabled) { background: var(--ep-accent-primary-hover); }
+.ep-reply-send:disabled { background: var(--ep-interactive-active); color: var(--ep-foreground-disabled); cursor: not-allowed; }

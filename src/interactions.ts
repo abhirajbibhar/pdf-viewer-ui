@@ -1,6 +1,7 @@
 import { Ann, BASE_PAGE_W, PAGE_RATIO, S, doc, pushHistory, uid, update, today, ZOOMS } from './state';
 import { TOOLS, STAMPS, ToolDef, bboxOf, defaultFor, repaintLayer } from './annotations';
 import { pickFile, setZoom } from './commands';
+import { categoryEnabled } from './features';
 
 type Drag =
   | { kind: 'pan'; x: number; y: number; sl: number; st: number; vp: HTMLElement }
@@ -127,7 +128,7 @@ function onDown(e: PointerEvent): void {
   if (ae?.isContentEditable && !t.closest('[contenteditable="true"]')) ae.blur();
 
   // close popups when pressing elsewhere
-  if ((S.menu || S.commentMenu) && !t.closest('.ep-menu') && !t.closest('[data-menu-trigger]')) {
+  if ((S.menu || S.commentMenu) && !t.closest('.ep-menu') && !t.closest('.ep-menu-sheet') && !t.closest('[data-menu-trigger]')) {
     S.menu = null; S.commentMenu = null; update();
   }
   if (e.button !== 0) return;
@@ -267,6 +268,7 @@ export function setupInteractions(root: HTMLElement): void {
     const d = doc();
     if (!vp || !d) return;
     e.preventDefault();
+    if (!categoryEnabled('zoom')) return;
     update(() => setZoom(e.deltaY < 0 ? ZOOMS.find((z) => z > d.zoom) ?? 1600 : [...ZOOMS].reverse().find((z) => z < d.zoom) ?? 25));
   }, { passive: false });
 

@@ -9,7 +9,8 @@ export interface Ann {
   color: string; opacity: number; width: number; blend: string;
   text?: string; kind?: string; src?: string; applied?: boolean; commentId?: string;
 }
-export interface Cmt { id: string; page: number; annId?: string; author: string; date: string; text: string; color: string }
+export interface Reply { id: string; author: string; date: string; text: string; color: string }
+export interface Cmt { id: string; page: number; annId?: string; author: string; date: string; text: string; color: string; replies?: Reply[] }
 export interface Doc {
   id: string; name: string; pages: number; content: PageContent[];
   anns: Ann[]; undo: string[]; redo: string[]; zoom: number; page: number; comments: Cmt[];
@@ -38,6 +39,7 @@ export const S = {
   selected: null as string | null,
   editingComment: null as string | null,
   commentMenu: null as string | null,
+  replyDraft: {} as Record<string, string>,   // unsent reply text per comment id (survives re-renders)
   outlineOpen: {} as Record<string, boolean>,
   fillMode: false,
   sigText: '',
@@ -103,7 +105,8 @@ export function removeAnn(d: Doc, id: string): void {
 export function initDocs(): void {
   const a = newDoc('ebook.pdf', 12);
   a.comments = [
-    { id: uid('c'), page: 1, author: 'Alex', date: 'Oct 19, 2026', text: 'Can we rephrase this sentence?', color: 'bg-blue' },
+    { id: uid('c'), page: 1, author: 'Alex', date: 'Oct 19, 2026', text: 'Can we rephrase this sentence?', color: 'bg-blue',
+      replies: [{ id: uid('r'), author: 'Priya', date: 'Oct 19, 2026', text: 'Agreed – I will tighten it up.', color: 'bg-purple' }] },
     { id: uid('c'), page: 1, author: 'Priya', date: 'Oct 18, 2026', text: 'Looks good to me.', color: 'bg-purple' },
     { id: uid('c'), page: 3, author: 'Sam', date: 'Oct 17, 2026', text: 'Please double-check this figure.', color: 'bg-green' },
   ];

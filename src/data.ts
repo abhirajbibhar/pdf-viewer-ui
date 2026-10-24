@@ -76,6 +76,8 @@ export const COMMANDS: Record<string, Command> = {
   'annotation:add-polygon': { label: 'Polygon', icon: 'polygon', primaryColor: RED, secondaryColor: 'transparent' },
   'annotation:add-polyline': { label: 'Polyline', icon: 'zigzag', primaryColor: RED },
   'annotation:overflow-tools': { label: 'More Tools', icon: 'dots' },
+  'annotation:overflow-shapes': { label: 'More Shapes', icon: 'dots' },
+  'form:overflow-tools': { label: 'More Form Tools', icon: 'dots' },
   // forms
   'form:add-textfield': { label: 'Text Field', icon: 'formTextfield' },
   'form:add-checkbox': { label: 'Checkbox', icon: 'formCheckbox' },

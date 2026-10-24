@@ -168,6 +168,8 @@
     selected: null,
     editingComment: null,
     commentMenu: null,
+    replyDraft: {},
+    // unsent reply text per comment id (survives re-renders)
     outlineOpen: {},
     fillMode: false,
     sigText: "",
@@ -234,7 +236,15 @@
   function initDocs() {
     const a = newDoc("ebook.pdf", 12);
     a.comments = [
-      { id: uid("c"), page: 1, author: "Alex", date: "Oct 19, 2026", text: "Can we rephrase this sentence?", color: "bg-blue" },
+      {
+        id: uid("c"),
+        page: 1,
+        author: "Alex",
+        date: "Oct 19, 2026",
+        text: "Can we rephrase this sentence?",
+        color: "bg-blue",
+        replies: [{ id: uid("r"), author: "Priya", date: "Oct 19, 2026", text: "Agreed \u2013 I will tighten it up.", color: "bg-purple" }]
+      },
       { id: uid("c"), page: 1, author: "Priya", date: "Oct 18, 2026", text: "Looks good to me.", color: "bg-purple" },
       { id: uid("c"), page: 3, author: "Sam", date: "Oct 17, 2026", text: "Please double-check this figure.", color: "bg-green" }
     ];
@@ -267,6 +277,7 @@
     callout: { stroke: "__P__", strokeWidth: null, body: '<path stroke="none" d="M0 0h24v24H0z" fill="none" /> <path d="M20 6v4a1 1 0 0 1 -1 1h-14a1 1 0 0 1 -1 -1v-4a1 1 0 0 1 1 -1h14a1 1 0 0 1 1 1" /> <path fill="none" d="M17 11v6h-9" /> <path fill="none" d="M8 15l-2 2l2 2" />' },
     comment: { stroke: "__P__", strokeWidth: null, body: '<path stroke="none" d="M0 0h24v24H0z" fill="none" /> <path d="M12 11v.01" /> <path d="M8 11v.01" /> <path d="M16 11v.01" /> <path d="M18 4a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3h-5l-5 3v-3h-2a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3z" />' },
     sidebar: { stroke: "__P__", strokeWidth: null, body: '<path stroke="none" d="M0 0h24v24H0z" fill="none" /> <path d="M4 18v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z" /> <path d="M10 18v-12a2 2 0 0 1 2 -2h6a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-6a2 2 0 0 1 -2 -2z" />' },
+    send: { stroke: "__P__", strokeWidth: null, body: '<path stroke="none" d="M0 0h24v24H0z" fill="none" /> <path d="M12 19l9 2l-9 -18l-9 18l9 -2z" /> <path d="M12 19v-8" />' },
     dots: { stroke: "__P__", strokeWidth: null, body: '<path stroke="none" d="M0 0h24v24H0z" fill="none" /> <path d="M5 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /> <path d="M12 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /> <path d="M19 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />' },
     vertical: { stroke: "__P__", strokeWidth: null, body: '<path stroke="none" d="M0 0h24v24H0z" fill="none" /> <path d="M8 7l4 -4l4 4" /> <path d="M8 17l4 4l4 -4" /> <path d="M12 3l0 18" />' },
     horizontal: { stroke: "__P__", strokeWidth: null, body: '<path stroke="none" d="M0 0h24v24H0z" fill="none" /> <path d="M7 8l-4 4l4 4" /> <path d="M17 8l4 4l-4 4" /> <path d="M3 12l18 0" />' },
@@ -353,11 +364,11 @@
     const { size = 24, strokeWidth = (_a = def.strokeWidth) != null ? _a : 2, primaryColor, secondaryColor, className } = opts;
     const P = primaryColor != null ? primaryColor : "currentColor";
     const S2 = secondaryColor != null ? secondaryColor : "currentColor";
-    const body = def.body.replace(/__P__/g, P).replace(/__S__/g, S2);
+    const body2 = def.body.replace(/__P__/g, P).replace(/__S__/g, S2);
     const stroke2 = def.stroke === null ? "" : `stroke="${def.stroke.replace("__P__", P)}"`;
     const cls = className ? `class="${className}"` : "";
     return fromHTML(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" ${stroke2} stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" ${cls} aria-hidden="true">${body}</svg>`
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" ${stroke2} stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" ${cls} aria-hidden="true">${body2}</svg>`
     );
   }
 
@@ -591,8 +602,148 @@
     if (old) old.replaceWith(buildLayer(page, preview));
   }
 
+  // src/config.ts
+  var DEFAULT_CONFIG = {
+    disabledCategories: [],
+    ui: { tabBar: "always" },
+    mobile: {
+      breakpoint: 768,
+      sidebarDrawer: true,
+      menuSheet: true,
+      drawer: { initialSnap: "half", resizable: true }
+    }
+  };
+  function resolve() {
+    var _a, _b;
+    const o = typeof window !== "undefined" && window.PDF_VIEWER_CONFIG || {};
+    const cfg = {
+      disabledCategories: [...(_a = o.disabledCategories) != null ? _a : DEFAULT_CONFIG.disabledCategories],
+      ui: { ...DEFAULT_CONFIG.ui, ...o.ui },
+      mobile: { ...DEFAULT_CONFIG.mobile, ...o.mobile, drawer: { ...DEFAULT_CONFIG.mobile.drawer, ...(_b = o.mobile) == null ? void 0 : _b.drawer } }
+    };
+    const fromUrl = new URLSearchParams(location.hash.slice(1)).get("disable");
+    if (fromUrl) cfg.disabledCategories.push(...fromUrl.split(",").map((s2) => s2.trim()).filter(Boolean));
+    const tabs = new URLSearchParams(location.hash.slice(1)).get("tabs");
+    if (tabs === "always" || tabs === "auto" || tabs === "never") cfg.ui.tabBar = tabs;
+    return cfg;
+  }
+  var config = resolve();
+  function isMobileWidth() {
+    const root2 = document.querySelector(".ep-root");
+    return !!root2 && root2.clientWidth > 0 && root2.clientWidth < config.mobile.breakpoint;
+  }
+  var useDrawerMode = () => config.mobile.sidebarDrawer && isMobileWidth();
+  var useSheetMode = () => config.mobile.menuSheet && isMobileWidth();
+
+  // src/features.ts
+  var ALIASES = {
+    open: "document-open",
+    close: "document-close",
+    print: "document-print",
+    export: "document-export",
+    download: "document-export",
+    screenshot: "document-capture",
+    fullscreen: "document-fullscreen",
+    view: "mode-view",
+    annotate: "mode-annotate",
+    shapes: "mode-shapes",
+    search: "panel-search",
+    comments: "panel-comment",
+    sidebar: "panel-sidebar",
+    thumbnails: "sidebar-thumbnails",
+    outline: "sidebar-outline",
+    replies: "comment-reply",
+    reply: "comment-reply",
+    undo: "history-undo",
+    redo: "history-redo",
+    tabs: "tab-bar",
+    forms: "form",
+    stamps: "insert-rubber-stamp"
+  };
+  var MARKUP = ["highlight", "underline", "strikeout", "squiggly", "insert-text", "replace-text"];
+  var INK = ["ink", "ink-highlighter"];
+  var TEXT = ["text", "callout"];
+  var SHAPE = ["rectangle", "circle", "line", "arrow", "polygon", "polyline"];
+  var MODE_EXTRA = {
+    annotate: ["annotation"],
+    shapes: ["annotation", "annotation-shape"],
+    insert: ["insert"],
+    form: ["form"],
+    redact: ["redaction"]
+  };
+  function categoriesOf(id) {
+    var _a;
+    const [ns, name = ""] = id.split(":");
+    switch (ns) {
+      case "document":
+        return name === "protect" ? ["document", "document-protect", "security"] : ["document", `document-${name}`];
+      case "zoom":
+        if (/^\d+$/.test(name)) return ["zoom", "zoom-level", `zoom-level-${name}`];
+        if (name.startsWith("toggle-menu")) return ["zoom", "zoom-menu"];
+        return ["zoom", `zoom-${name}`];
+      case "pan":
+        return ["tools", "pan"];
+      case "pointer":
+        return ["tools", "pointer"];
+      case "left-action-menu":
+        return ["ui", "ui-menu"];
+      case "panel": {
+        const p = name.replace("toggle-", "");
+        return p === "redaction" ? ["panel", "panel-redaction", "redaction"] : ["panel", `panel-${p}`];
+      }
+      case "page":
+        return ["page", `page-${name}`];
+      case "spread":
+        return ["page", "spread", `spread-${name}`];
+      case "rotate":
+        return ["page", "rotate", `rotate-${name}`];
+      case "scroll":
+        return name === "next-page" || name === "previous-page" ? ["page", "navigation", name === "next-page" ? "navigation-next" : "navigation-previous"] : ["page", "scroll", `scroll-${name}`];
+      case "mode":
+        return ["mode", `mode-${name}`, ...(_a = MODE_EXTRA[name]) != null ? _a : []];
+      case "tabs":
+        return ["mode", "mode-menu"];
+      case "annotation": {
+        if (name === "overflow-tools") return ["annotation", "ui-menu"];
+        if (name === "overflow-shapes") return ["annotation", "annotation-shape", "ui-menu"];
+        const t = name.replace("add-", "");
+        const group = MARKUP.includes(t) ? "annotation-markup" : INK.includes(t) ? "annotation-ink" : TEXT.includes(t) ? "annotation-text" : SHAPE.includes(t) ? "annotation-shape" : t === "comment" ? "annotation-comment" : "";
+        return ["annotation", ...group ? [group] : [], `annotation-${t}`];
+      }
+      case "form":
+        if (name === "overflow-tools") return ["form", "ui-menu"];
+        return ["form", `form-${name.replace("add-", "").replace("toggle-", "")}`];
+      case "insert":
+        return ["insert", `insert-${name.replace("add-", "")}`];
+      case "redaction":
+        return ["redaction", "redaction-area"];
+      case "history":
+        return ["history", `history-${name}`];
+      default:
+        return [];
+    }
+  }
+  var disabled = new Set(
+    config.disabledCategories.map((c2) => c2.trim().toLowerCase()).filter(Boolean).map((c2) => {
+      var _a;
+      return (_a = ALIASES[c2]) != null ? _a : c2;
+    })
+  );
+  function categoryEnabled(cat) {
+    var _a;
+    const c2 = cat.toLowerCase();
+    return !disabled.has((_a = ALIASES[c2]) != null ? _a : c2);
+  }
+  function isEnabled(id) {
+    if (id === "panel:toggle-sidebar" && !categoryEnabled("sidebar-thumbnails") && !categoryEnabled("sidebar-outline")) return false;
+    return categoriesOf(id).every(categoryEnabled);
+  }
+
   // src/components/tabBar.ts
   function tabBar() {
+    if (!categoryEnabled("tab-bar") || config.ui.tabBar === "never") return null;
+    if (config.ui.tabBar === "auto" && S.docs.length <= 1) return null;
+    const canClose = isEnabled("document:close"), canOpen = isEnabled("document:open");
     return h(
       "div",
       { class: "ep-tabbar" },
@@ -605,10 +756,10 @@
             "div",
             { class: `ep-doc-tab${active ? " is-active" : ""}`, role: "tab", tabindex: 0, "aria-selected": active, "data-act": "tab-select", "data-arg": t.id },
             h("span", { class: "ep-doc-tab-name" }, t.name),
-            h("button", { type: "button", class: "ep-doc-tab-close", "aria-label": `Close ${t.name}`, "data-act": "tab-close", "data-arg": t.id }, icon("x", { size: 14 }))
+            canClose ? h("button", { type: "button", class: "ep-doc-tab-close", "aria-label": `Close ${t.name}`, "data-act": "tab-close", "data-arg": t.id }, icon("x", { size: 14 })) : null
           );
         }),
-        h("button", { type: "button", class: "ep-tab-add", "data-tip": "Open File", "aria-label": "Open File", "data-act": "tab-add" }, icon("plus", { size: 14 }))
+        canOpen ? h("button", { type: "button", class: "ep-tab-add", "data-tip": "Open File", "aria-label": "Open File", "data-act": "tab-add" }, icon("plus", { size: 14 })) : null
       )
     );
   }
@@ -682,6 +833,8 @@
     "annotation:add-polygon": { label: "Polygon", icon: "polygon", primaryColor: RED2, secondaryColor: "transparent" },
     "annotation:add-polyline": { label: "Polyline", icon: "zigzag", primaryColor: RED2 },
     "annotation:overflow-tools": { label: "More Tools", icon: "dots" },
+    "annotation:overflow-shapes": { label: "More Shapes", icon: "dots" },
+    "form:overflow-tools": { label: "More Form Tools", icon: "dots" },
     // forms
     "form:add-textfield": { label: "Text Field", icon: "formTextfield" },
     "form:add-checkbox": { label: "Checkbox", icon: "formCheckbox" },
@@ -811,6 +964,10 @@
         return S.menu === "tabs";
       case "annotation:overflow-tools":
         return S.menu === "annot-more";
+      case "annotation:overflow-shapes":
+        return S.menu === "shapes-more";
+      case "form:overflow-tools":
+        return S.menu === "forms-more";
       case "form:toggle-fill-mode":
         return S.fillMode;
       case "spread:none":
@@ -852,11 +1009,13 @@
     "zoom:toggle-menu-mobile": "zoom",
     "left-action-menu:overflow-menu": "left",
     "tabs:overflow-menu": "tabs",
-    "annotation:overflow-tools": "annot-more"
+    "annotation:overflow-tools": "annot-more",
+    "annotation:overflow-shapes": "shapes-more",
+    "form:overflow-tools": "forms-more"
   };
   function execute(id) {
     const d = doc();
-    if (isDisabled(id)) return;
+    if (!isEnabled(id) || isDisabled(id)) return;
     if (MENU_TOGGLES[id]) {
       update(() => {
         const m = S.menu, t = MENU_TOGGLES[id];
@@ -1011,59 +1170,12 @@
     S.selected = null;
   }
 
-  // src/components/buttons.ts
-  var MENU_TRIGGERS = /* @__PURE__ */ new Set([
-    "document:menu",
-    "page:settings",
-    "zoom:toggle-menu",
-    "zoom:toggle-menu-mobile",
-    "left-action-menu:overflow-menu",
-    "tabs:overflow-menu",
-    "annotation:overflow-tools"
-  ]);
-  function commandButton(commandId, opts = {}) {
-    var _a;
-    const c2 = cmd(commandId);
-    const active = isActive(commandId);
-    const disabled = isDisabled(commandId);
-    const btn = h("button", {
-      type: "button",
-      class: ["ep-btn", active ? "is-active" : "", disabled ? "is-disabled" : "", (_a = opts.className) != null ? _a : ""].filter(Boolean).join(" "),
-      "data-tip": c2.label,
-      "aria-label": c2.label,
-      "aria-pressed": active,
-      "data-command": commandId,
-      "data-menu-trigger": MENU_TRIGGERS.has(commandId) ? "1" : void 0,
-      disabled
-    });
-    let primary = c2.primaryColor, secondary = c2.secondaryColor;
-    if (TOOLS[commandId]) {
-      const st2 = toolStyle(commandId);
-      if (primary) primary = st2.color;
-    }
-    if (c2.icon) btn.appendChild(icon(c2.icon, { size: 20, primaryColor: primary, secondaryColor: secondary }));
-    else btn.appendChild(h("span", { class: "ep-btn-text" }, c2.label));
-    return btn;
-  }
-  function tabButton(commandId, className = "") {
-    const active = isActive(commandId);
-    return h("button", {
-      type: "button",
-      role: "tab",
-      "aria-selected": active,
-      "data-command": commandId,
-      class: `ep-tab-btn${active ? " is-active" : ""} ${className}`.trim()
-    }, cmd(commandId).label);
-  }
-  var divider = (className = "") => h("div", { class: `ep-divider-wrap ${className}`.trim() }, h("div", { class: "ep-divider", "aria-hidden": true }));
-  var spacer = () => h("div", { class: "ep-spacer", "aria-hidden": true });
-  var anchor = (child, popup, className = "") => h("div", { class: `ep-anchor ${className}`.trim() }, child, popup);
-
   // src/components/menus.ts
-  function renderEntry(e) {
+  function renderEntry(e, mobile) {
     var _a;
     if (e.type === "divider") return h("hr", { class: "ep-menu-divider" });
     if (e.type === "section") return h("div", { class: "ep-menu-section" }, e.label);
+    const size = mobile ? 20 : 24;
     if (e.type === "back")
       return h(
         "button",
@@ -1074,23 +1186,23 @@
     if (e.type === "sub")
       return h(
         "button",
-        { type: "button", class: "ep-menu-item", "data-act": "menu-go", "data-arg": e.to },
-        h("span", { class: "ep-menu-icon" }, icon(e.icon, { size: 24 })),
+        { type: "button", role: "menuitem", class: "ep-menu-item", "data-act": "menu-go", "data-arg": e.to },
+        mobile ? null : h("span", { class: "ep-menu-icon" }, icon(e.icon, { size })),
         h("span", { class: "ep-menu-label" }, e.label),
-        h("span", { class: "ep-menu-chevron" }, icon("chevronRight", { size: 16 }))
+        h("span", { class: "ep-menu-chevron" }, icon("chevronRight", { size: mobile ? 16 : 16 }))
       );
     const c2 = cmd(e.id);
-    const active = isActive(e.id), disabled = isDisabled(e.id);
+    const active = isActive(e.id), disabled2 = isDisabled(e.id);
     return h("button", {
       type: "button",
       role: "menuitem",
       "data-command": e.id,
-      class: `ep-menu-item${active ? " is-active" : ""}${disabled ? " is-disabled" : ""}`
-    }, h("span", { class: "ep-menu-icon" }, c2.icon ? icon(c2.icon, { size: 24 }) : null), h("span", { class: "ep-menu-label" }, (_a = e.label) != null ? _a : c2.label));
+      class: `ep-menu-item${active ? " is-active" : ""}${disabled2 ? " is-disabled" : ""}`
+    }, h("span", { class: "ep-menu-icon" }, c2.icon ? icon(c2.icon, { size }) : null), h("span", { class: "ep-menu-label" }, (_a = e.label) != null ? _a : c2.label));
   }
   var c = (id, label) => ({ type: "command", id, label });
   var div = { type: "divider" };
-  var PAGE_ENTRIES = [
+  var PAGE_ENTRIES = () => [
     { type: "section", label: "Spread Mode" },
     c("spread:none"),
     c("spread:odd"),
@@ -1106,43 +1218,181 @@
     div,
     c("document:fullscreen")
   ];
-  var PRESETS = [25, 50, 100, 125, 150, 200, 400, 800, 1600].map((z) => c(`zoom:${z}`, `${z}%`));
+  var PRESETS = () => [25, 50, 100, 125, 150, 200, 400, 800, 1600].map((z) => c(`zoom:${z}`, `${z}%`));
   function zoomEntries(levelsMenu) {
     var _a, _b;
     const w = (_b = (_a = document.querySelector(".ep-root")) == null ? void 0 : _a.clientWidth) != null ? _b : 1280;
     const sub = { type: "sub", to: levelsMenu, label: "Zoom Level", icon: "zoomIn" };
     const tail = [div, c("zoom:fit-page"), c("zoom:fit-width"), div, c("zoom:marquee")];
-    if (w >= 768) return [...PRESETS, ...tail];
+    if (w >= 768) return [...PRESETS(), ...tail];
     if (w <= 640) return [sub, div, c("zoom:in"), c("zoom:out"), ...tail];
-    return [...PRESETS, sub, div, c("zoom:in"), c("zoom:out"), ...tail];
+    return [...PRESETS(), sub, div, c("zoom:in"), c("zoom:out"), ...tail];
   }
   var MENUS = {
-    document: () => [c("document:open"), c("document:close"), div, c("document:print"), c("document:protect"), c("document:capture"), c("document:export"), div, c("document:fullscreen")],
-    page: () => PAGE_ENTRIES,
-    zoom: () => zoomEntries("zoom-levels"),
-    "zoom-levels": () => [{ type: "back", to: "zoom" }, div, ...PRESETS],
-    "left-zoom-levels": () => [{ type: "back", to: "left-zoom" }, div, ...PRESETS],
-    left: () => [
-      { type: "sub", to: "left-page", label: "View Controls", icon: "viewSettings" },
-      { type: "sub", to: "left-zoom", label: "Zoom Controls", icon: "zoomIn" },
-      div,
-      c("pan:toggle"),
-      c("pointer:toggle")
-    ],
-    "left-page": () => [{ type: "back", to: "left" }, div, ...PAGE_ENTRIES],
-    "left-zoom": () => [{ type: "back", to: "left" }, div, ...zoomEntries("left-zoom-levels")],
-    tabs: () => ["view", "annotate", "shapes", "insert", "form", "redact"].map((m) => c(`mode:${m}`)),
-    "annot-more": () => ["text", "ink", "ink-highlighter", "insert-text", "replace-text", "comment", "callout"].map((t) => c(`annotation:add-${t}`))
+    document: { entries: () => [c("document:open"), c("document:close"), div, c("document:print"), c("document:protect"), c("document:capture"), c("document:export"), div, c("document:fullscreen")] },
+    page: { entries: PAGE_ENTRIES },
+    zoom: { entries: () => zoomEntries("zoom-levels") },
+    "zoom-levels": { parent: "zoom", title: "Zoom Level", entries: PRESETS },
+    left: {
+      entries: () => [
+        { type: "sub", to: "left-page", label: "View Controls", icon: "viewSettings" },
+        { type: "sub", to: "left-zoom", label: "Zoom Controls", icon: "zoomIn" },
+        div,
+        c("pan:toggle"),
+        c("pointer:toggle")
+      ]
+    },
+    "left-page": { parent: "left", title: "View Controls", entries: PAGE_ENTRIES },
+    "left-zoom": { parent: "left", title: "Zoom Controls", entries: () => zoomEntries("left-zoom-levels") },
+    "left-zoom-levels": { parent: "left-zoom", title: "Zoom Level", entries: PRESETS },
+    tabs: { entries: () => ["view", "annotate", "shapes", "insert", "form", "redact"].map((m) => c(`mode:${m}`)) },
+    "shapes-more": { entries: () => ["polygon", "polyline"].map((t) => c(`annotation:add-${t}`)) },
+    "forms-more": { entries: () => ["select", "listbox"].map((t) => c(`form:add-${t}`)) },
+    "annot-more": { entries: () => ["text", "ink", "ink-highlighter", "insert-text", "replace-text", "comment", "callout"].map((t) => c(`annotation:add-${t}`)) }
   };
+  var hasContent = (list) => list.some((e) => e.type === "command" || e.type === "sub");
+  function visible(entries) {
+    let out = entries.filter((e) => e.type === "command" ? isEnabled(e.id) : e.type === "sub" ? menuAvailable(e.to) : true);
+    const before = out;
+    out = out.filter((e, i) => {
+      if (e.type !== "section") return true;
+      for (let j = i + 1; j < before.length; j++) {
+        const n = before[j];
+        if (n.type === "command" || n.type === "sub") return true;
+        if (n.type === "section" || n.type === "divider") return false;
+      }
+      return false;
+    });
+    const res = [];
+    for (const e of out) {
+      if (e.type === "divider") {
+        const prev = res[res.length - 1];
+        if (!prev || prev.type === "divider") continue;
+      }
+      res.push(e);
+    }
+    while (res.length && res[res.length - 1].type === "divider") res.pop();
+    return res;
+  }
+  function entriesFor(id, mobile) {
+    const def = MENUS[id];
+    if (!def) return [];
+    const base = def.entries();
+    const full = def.parent && !mobile ? [{ type: "back", to: def.parent }, div, ...base] : base;
+    return visible(full);
+  }
+  function menuAvailable(id) {
+    return hasContent(entriesFor(id, false));
+  }
   function menuIf(...ids) {
     const open = S.menu;
-    if (!open || !ids.includes(open)) return null;
-    return h("div", { class: "ep-menu", role: "menu", "data-scroll": "menu" }, MENUS[open]().map(renderEntry));
+    if (!open || !ids.includes(open) || useSheetMode()) return null;
+    const entries = entriesFor(open, false);
+    if (!hasContent(entries)) return null;
+    return h("div", { class: "ep-menu", role: "menu", "data-scroll": "menu" }, entries.map((e) => renderEntry(e, false)));
+  }
+  function sheetMenu() {
+    var _a;
+    const id = S.menu;
+    if (!id || !MENUS[id]) return null;
+    const entries = entriesFor(id, true);
+    if (!hasContent(entries)) return null;
+    const def = MENUS[id];
+    return h(
+      "div",
+      { class: "ep-sheet-menu", "data-menu-id": id },
+      def.parent ? h(
+        "div",
+        { class: "ep-sheet-header" },
+        h("button", { type: "button", class: "ep-sheet-back", "aria-label": "Back", "data-act": "menu-go", "data-arg": def.parent }, icon("chevronLeft", { size: 20 })),
+        h("h3", {}, (_a = def.title) != null ? _a : "Menu")
+      ) : null,
+      h("div", { class: "ep-sheet-items", role: "menu", "data-scroll": "menu" }, entries.map((e) => renderEntry(e, true)))
+    );
+  }
+
+  // src/components/buttons.ts
+  var MENU_TRIGGERS = /* @__PURE__ */ new Set([
+    "document:menu",
+    "page:settings",
+    "zoom:toggle-menu",
+    "zoom:toggle-menu-mobile",
+    "left-action-menu:overflow-menu",
+    "tabs:overflow-menu",
+    "annotation:overflow-tools"
+  ]);
+  var TRIGGER_MENU = {
+    "document:menu": "document",
+    "page:settings": "page",
+    "zoom:toggle-menu": "zoom",
+    "zoom:toggle-menu-mobile": "zoom",
+    "left-action-menu:overflow-menu": "left",
+    "tabs:overflow-menu": "tabs",
+    "annotation:overflow-tools": "annot-more",
+    "annotation:overflow-shapes": "shapes-more",
+    "form:overflow-tools": "forms-more"
+  };
+  function commandButton(commandId, opts = {}) {
+    var _a;
+    if (!isEnabled(commandId)) return null;
+    if (TRIGGER_MENU[commandId] && !menuAvailable(TRIGGER_MENU[commandId])) return null;
+    const c2 = cmd(commandId);
+    const active = isActive(commandId);
+    const disabled2 = isDisabled(commandId);
+    const btn = h("button", {
+      type: "button",
+      class: ["ep-btn", active ? "is-active" : "", disabled2 ? "is-disabled" : "", (_a = opts.className) != null ? _a : ""].filter(Boolean).join(" "),
+      "data-tip": c2.label,
+      "aria-label": c2.label,
+      "aria-pressed": active,
+      "data-command": commandId,
+      "data-menu-trigger": MENU_TRIGGERS.has(commandId) ? "1" : void 0,
+      disabled: disabled2
+    });
+    let primary = c2.primaryColor, secondary = c2.secondaryColor;
+    if (TOOLS[commandId]) {
+      const st2 = toolStyle(commandId);
+      if (primary) primary = st2.color;
+    }
+    if (c2.icon) btn.appendChild(icon(c2.icon, { size: 20, primaryColor: primary, secondaryColor: secondary }));
+    else btn.appendChild(h("span", { class: "ep-btn-text" }, c2.label));
+    return btn;
+  }
+  function tabButton(commandId, className = "") {
+    if (!isEnabled(commandId)) return null;
+    const active = isActive(commandId);
+    return h("button", {
+      type: "button",
+      role: "tab",
+      "aria-selected": active,
+      "data-command": commandId,
+      class: `ep-tab-btn${active ? " is-active" : ""} ${className}`.trim()
+    }, cmd(commandId).label);
+  }
+  var divider = (className = "") => h("div", { class: `ep-divider-wrap ${className}`.trim() }, h("div", { class: "ep-divider", "aria-hidden": true }));
+  var spacer = () => h("div", { class: "ep-spacer", "aria-hidden": true });
+  var anchor = (child, popup, className = "") => child ? h("div", { class: `ep-anchor ${className}`.trim() }, child, popup) : null;
+  function tidy(el) {
+    const isDiv = (n) => n.classList.contains("ep-divider-wrap");
+    el.querySelectorAll(":scope > .ep-group").forEach((g) => {
+      tidy(g);
+      if (!g.children.length) g.remove();
+    });
+    let prevDiv = true;
+    for (const c2 of Array.from(el.children)) {
+      if (isDiv(c2)) {
+        if (prevDiv) c2.remove();
+        else prevDiv = true;
+      } else if (!c2.classList.contains("ep-spacer")) prevDiv = false;
+    }
+    while (el.lastElementChild && isDiv(el.lastElementChild)) el.lastElementChild.remove();
+    return el;
   }
 
   // src/components/toolbar.ts
   function zoomToolbar() {
     var _a;
+    if (!categoryEnabled("zoom")) return null;
     const d = doc();
     return h(
       "div",
@@ -1165,13 +1415,14 @@
   function modeSelect() {
     const label = S.mode.charAt(0).toUpperCase() + S.mode.slice(1);
     const btn = commandButton("tabs:overflow-menu");
+    if (!btn) return null;
     btn.className = "ep-btn ep-mode-select" + (S.menu === "tabs" ? " is-active" : "");
     btn.replaceChildren(h("span", { class: "ep-mode-select-label" }, label));
     btn.insertAdjacentHTML("beforeend", '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6l6 -6"/></svg>');
     return h("div", { class: "ep-mode-select-wrap show-lt-640" }, anchor(btn, menuIf("tabs"), "ep-anchor-block"));
   }
   function mainToolbar() {
-    return h(
+    return tidy(h(
       "div",
       { class: "ep-toolbar ep-toolbar-main", role: "toolbar" },
       h(
@@ -1208,10 +1459,14 @@
       ),
       spacer(),
       h("div", { class: "ep-group" }, commandButton("panel:toggle-search"), commandButton("panel:toggle-comment"))
-    );
+    ));
   }
   var history = () => [commandButton("history:undo"), commandButton("history:redo")];
-  var sec = (items) => h("div", { class: "ep-toolbar ep-toolbar-secondary", role: "toolbar" }, spacer(), h("div", { class: "ep-group" }, items), spacer());
+  var sec = (items) => {
+    const bar2 = h("div", { class: "ep-toolbar ep-toolbar-secondary", role: "toolbar" }, spacer(), h("div", { class: "ep-group" }, items), spacer());
+    tidy(bar2);
+    return bar2.querySelector(".ep-group") ? bar2 : null;
+  };
   function secondaryToolbar() {
     const style = commandButton("panel:toggle-annotation-style");
     switch (S.mode) {
@@ -1230,7 +1485,9 @@
         ]);
       case "shapes":
         return sec([
-          ...["rectangle", "circle", "line", "arrow", "polygon", "polyline"].map((t) => commandButton(`annotation:add-${t}`)),
+          ...["rectangle", "circle", "line", "arrow"].map((t) => commandButton(`annotation:add-${t}`)),
+          ...["polygon", "polyline"].map((t) => commandButton(`annotation:add-${t}`, { className: "hide-lt-640" })),
+          anchor(commandButton("annotation:overflow-shapes", { className: "show-lt-640" }), menuIf("shapes-more"), "show-lt-640"),
           divider(),
           style,
           divider(),
@@ -1238,7 +1495,9 @@
         ]);
       case "form":
         return sec([
-          ...["textfield", "checkbox", "radio", "select", "listbox"].map((t) => commandButton(`form:add-${t}`)),
+          ...["textfield", "checkbox", "radio"].map((t) => commandButton(`form:add-${t}`)),
+          ...["select", "listbox"].map((t) => commandButton(`form:add-${t}`, { className: "hide-lt-640" })),
+          anchor(commandButton("form:overflow-tools", { className: "show-lt-640" }), menuIf("forms-more"), "show-lt-640"),
           divider(),
           style,
           commandButton("form:toggle-fill-mode"),
@@ -1345,6 +1604,7 @@
     );
   }
   function pageControls(d) {
+    if (!categoryEnabled("navigation")) return null;
     return h(
       "div",
       { class: "ep-overlay ep-overlay-bottom-center" },
@@ -1372,7 +1632,7 @@
         h("div", { class: "ep-empty-icon" }, icon("file", { size: 48 })),
         h("h2", { class: "ep-empty-title" }, "No Documents Open"),
         h("p", { class: "ep-empty-desc" }, "Open a PDF document to get started.", h("br"), "You can view multiple documents using tabs."),
-        h("button", { type: "button", class: "ep-primary-btn", "data-act": "tab-add" }, icon("plus", { size: 16 }), "Open Document"),
+        isEnabled("document:open") ? h("button", { type: "button", class: "ep-primary-btn", "data-act": "tab-add" }, icon("plus", { size: 16 }), "Open Document") : null,
         h("p", { class: "ep-empty-hint" }, "Supported format: PDF")
       )
     );
@@ -1381,6 +1641,8 @@
   // src/components/sidebars.ts
   function segmented() {
     const tab = (id, ic, cls) => h("button", { type: "button", role: "tab", "aria-selected": S.leftTab === id, class: `ep-seg ${cls}${S.leftTab === id ? " is-active" : ""}`, "data-tip": id === "thumbnails" ? "Thumbnails" : "Outline", "data-act": "left-tab", "data-arg": id }, icon(ic, { size: 20 }));
+    const tabs = [categoryEnabled("sidebar-thumbnails") ? "thumbnails" : null, categoryEnabled("sidebar-outline") ? "outline" : null].filter(Boolean);
+    if (tabs.length < 2) return null;
     return h("div", { class: "ep-seg-group", role: "tablist" }, tab("thumbnails", "squares", "first"), tab("outline", "listTree", "last"));
   }
   function thumbnails(d) {
@@ -1490,47 +1752,93 @@
       )
     );
   }
+  var avatar = (name, color) => h("div", { class: `ep-avatar ${color}` }, name.charAt(0).toUpperCase());
+  function itemMenu(id) {
+    const canEdit = categoryEnabled("comment-edit"), canDelete = categoryEnabled("comment-delete");
+    if (!canEdit && !canDelete) return null;
+    return h(
+      "div",
+      { class: "ep-anchor" },
+      h("button", { type: "button", class: "ep-card-menu", "aria-label": "Menu", "data-act": "comment-menu", "data-arg": id, "data-menu-trigger": "1" }, icon("dots", { size: 16 })),
+      S.commentMenu === id ? h(
+        "div",
+        { class: "ep-menu ep-menu-small", role: "menu" },
+        canEdit ? h("button", { type: "button", class: "ep-menu-item", "data-act": "comment-edit", "data-arg": id }, h("span", { class: "ep-menu-label" }, "Edit")) : null,
+        canDelete ? h("button", { type: "button", class: "ep-menu-item", "data-act": "comment-delete", "data-arg": id }, h("span", { class: "ep-menu-label" }, "Delete")) : null
+      ) : null
+    );
+  }
+  function editForm(id, text) {
+    return h(
+      "div",
+      { class: "ep-card-edit" },
+      h("textarea", { class: "ep-textarea", rows: 3, "data-focus": "comment-edit", "data-in": "comment-text", "data-arg": id }, text),
+      h(
+        "div",
+        { class: "ep-card-edit-actions" },
+        h("button", { type: "button", class: "ep-secondary-btn ep-sm", "data-act": "comment-cancel" }, "Cancel"),
+        h("button", { type: "button", class: "ep-primary-btn ep-sm", "data-act": "comment-save", "data-arg": id }, "Save")
+      )
+    );
+  }
+  function replyItem(r) {
+    const editing = S.editingComment === r.id;
+    return h(
+      "div",
+      { class: "ep-reply" },
+      avatar(r.author, r.color),
+      h(
+        "div",
+        { class: "ep-card-main" },
+        h(
+          "div",
+          { class: "ep-card-head" },
+          h("div", { class: "ep-card-author" }, h("h5", {}, r.author), h("span", {}, r.date)),
+          itemMenu(r.id)
+        ),
+        editing ? editForm(r.id, r.text) : h("p", { class: "ep-card-text" }, r.text)
+      )
+    );
+  }
+  function replyForm(c2) {
+    var _a;
+    const draft = (_a = S.replyDraft[c2.id]) != null ? _a : "";
+    return h(
+      "div",
+      { class: "ep-reply-form", "data-act": "noop" },
+      h("input", { type: "text", class: "ep-reply-field", placeholder: "Add reply", value: draft, "aria-label": "Add reply", autocomplete: "off", "data-in": "reply-text", "data-arg": c2.id, "data-focus": `reply-${c2.id}` }),
+      h("button", { type: "button", class: "ep-reply-send", "aria-label": "Send reply", "data-act": "reply-send", "data-arg": c2.id, ...draft.trim() ? {} : { disabled: true } }, icon("send", { size: 20 }))
+    );
+  }
   function commentCard(c2) {
+    var _a;
     const editing = S.editingComment === c2.id;
     const selected = !!c2.annId && S.selected === c2.annId;
+    const replies = (_a = c2.replies) != null ? _a : [];
     return h(
       "div",
       { class: `ep-card${selected ? " is-selected" : ""}`, "data-act": "comment-go", "data-arg": c2.id },
       h(
         "div",
         { class: "ep-card-body" },
-        h("div", { class: `ep-avatar ${c2.color}` }, c2.author.charAt(0).toUpperCase()),
         h(
           "div",
-          { class: "ep-card-main" },
+          { class: "ep-card-row" },
+          avatar(c2.author, c2.color),
           h(
             "div",
-            { class: "ep-card-head" },
-            h("div", { class: "ep-card-author" }, h("h4", {}, c2.author), h("span", {}, c2.date)),
+            { class: "ep-card-main" },
             h(
               "div",
-              { class: "ep-anchor" },
-              h("button", { type: "button", class: "ep-card-menu", "aria-label": "Menu", "data-act": "comment-menu", "data-arg": c2.id, "data-menu-trigger": "1" }, icon("dots", { size: 16 })),
-              S.commentMenu === c2.id ? h(
-                "div",
-                { class: "ep-menu ep-menu-small", role: "menu" },
-                h("button", { type: "button", class: "ep-menu-item", "data-act": "comment-edit", "data-arg": c2.id }, h("span", { class: "ep-menu-label" }, "Edit")),
-                h("button", { type: "button", class: "ep-menu-item", "data-act": "comment-delete", "data-arg": c2.id }, h("span", { class: "ep-menu-label" }, "Delete"))
-              ) : null
-            )
-          ),
-          editing ? h(
-            "div",
-            { class: "ep-card-edit" },
-            h("textarea", { class: "ep-textarea", rows: 3, "data-focus": "comment-edit", "data-in": "comment-text", "data-arg": c2.id }, c2.text),
-            h(
-              "div",
-              { class: "ep-card-edit-actions" },
-              h("button", { type: "button", class: "ep-secondary-btn ep-sm", "data-act": "comment-cancel" }, "Cancel"),
-              h("button", { type: "button", class: "ep-primary-btn ep-sm", "data-act": "comment-save", "data-arg": c2.id }, "Save")
-            )
-          ) : h("p", { class: "ep-card-text" }, c2.text)
-        )
+              { class: "ep-card-head" },
+              h("div", { class: "ep-card-author" }, h("h4", {}, c2.author), h("span", {}, c2.date)),
+              itemMenu(c2.id)
+            ),
+            editing ? editForm(c2.id, c2.text) : h("p", { class: "ep-card-text" }, c2.text)
+          )
+        ),
+        replies.length ? h("div", { class: "ep-reply-list" }, replies.map(replyItem)) : null,
+        categoryEnabled("comment-reply") && !editing ? replyForm(c2) : null
       )
     );
   }
@@ -1614,12 +1922,269 @@
     );
   }
   function rightSidebar(d) {
-    const body = S.right === "search" ? searchPanel(d) : S.right === "comment" ? commentPanel(d) : S.right === "style" ? stylePanel(d) : redactionPanel(d);
-    return h("aside", { class: "ep-sidebar ep-sidebar-right" }, body);
+    const body2 = S.right === "search" ? searchPanel(d) : S.right === "comment" ? commentPanel(d) : S.right === "style" ? stylePanel(d) : redactionPanel(d);
+    return h("aside", { class: "ep-sidebar ep-sidebar-right" }, body2);
+  }
+
+  // src/components/drawer.ts
+  var PCT = { closed: 0, half: 50, full: 100 };
+  var ANIMATION_MS = 300;
+  var VELOCITY_THRESHOLD = 0.5;
+  var SNAP_FULL_ABOVE = 75;
+  var SNAP_CLOSE_BELOW = 25;
+  var TAP_SLOP = 5;
+  var backdrop = h("div", { class: "ep-drawer-backdrop" });
+  var body = h("div", { class: "ep-drawer-body" });
+  var handle = h("div", { class: "ep-drawer-handle", "aria-hidden": "true" }, h("div", { class: "ep-drawer-grip" }));
+  var sheet = h("div", { class: "ep-drawer", role: "dialog", "aria-modal": "true" }, handle, body);
+  var drawerLayer = h("div", { class: "ep-drawer-layer" }, backdrop, sheet);
+  var visible2 = false;
+  var snap = "closed";
+  var hideTimer = 0;
+  var openToken = 0;
+  var prevLeft = false;
+  function normalizePanels(mobile) {
+    if (mobile && S.leftOpen && S.right) {
+      if (!prevLeft) S.right = null;
+      else S.leftOpen = false;
+    }
+    prevLeft = S.leftOpen;
+  }
+  function closePanels() {
+    update(() => {
+      S.leftOpen = false;
+      S.right = null;
+    });
+  }
+  function paint(pct) {
+    sheet.style.height = `${pct}%`;
+    backdrop.style.opacity = String(Math.min(pct / PCT.half, 1) * 0.6);
+    backdrop.style.pointerEvents = pct === 0 ? "none" : "auto";
+  }
+  function show() {
+    window.clearTimeout(hideTimer);
+    hideTimer = 0;
+    if (visible2) {
+      snap = snap === "closed" ? config.mobile.drawer.initialSnap : snap;
+      paint(PCT[snap]);
+      return;
+    }
+    visible2 = true;
+    snap = "closed";
+    drawerLayer.classList.add("is-visible");
+    paint(0);
+    void sheet.offsetHeight;
+    const token2 = ++openToken;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (token2 !== openToken || !visible2) return;
+      snap = config.mobile.drawer.initialSnap;
+      paint(PCT[snap]);
+    }));
+  }
+  function hide(immediate = false) {
+    if (!visible2) return;
+    openToken++;
+    snap = "closed";
+    const finish = () => {
+      hideTimer = 0;
+      visible2 = false;
+      drawerLayer.classList.remove("is-visible");
+      body.replaceChildren();
+    };
+    if (immediate) {
+      window.clearTimeout(hideTimer);
+      finish();
+      return;
+    }
+    paint(0);
+    if (!hideTimer) hideTimer = window.setTimeout(finish, ANIMATION_MS);
+  }
+  function syncDrawer(d, mobile) {
+    const panel = d && mobile ? S.right ? "right" : S.leftOpen ? "left" : null : null;
+    if (!d || !panel) {
+      hide(!mobile);
+      return;
+    }
+    const el = panel === "left" ? leftSidebar(d) : rightSidebar(d);
+    el.classList.add("in-drawer");
+    body.replaceChildren(el);
+    sheet.setAttribute("data-panel", panel === "left" ? "left" : S.right);
+    show();
+  }
+  backdrop.addEventListener("click", closePanels);
+  if (!config.mobile.drawer.resizable) handle.classList.add("is-static");
+  var drag = null;
+  handle.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0 || !visible2 || !config.mobile.drawer.resizable) return;
+    const total = drawerLayer.clientHeight || 1;
+    drag = { id: e.pointerId, startY: e.clientY, startPct: sheet.offsetHeight / total * 100, moved: false, samples: [{ y: e.clientY, t: performance.now() }] };
+    handle.setPointerCapture(e.pointerId);
+    sheet.classList.add("is-dragging");
+    backdrop.classList.add("is-dragging");
+    e.preventDefault();
+  });
+  handle.addEventListener("pointermove", (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const total = drawerLayer.clientHeight || 1;
+    if (Math.abs(e.clientY - drag.startY) >= TAP_SLOP) drag.moved = true;
+    const pct = Math.max(0, Math.min(100, drag.startPct + (drag.startY - e.clientY) / total * 100));
+    const now = performance.now();
+    drag.samples.push({ y: e.clientY, t: now });
+    while (drag.samples.length > 2 && now - drag.samples[0].t > 100) drag.samples.shift();
+    paint(pct);
+  });
+  function endDrag(e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    const d = drag;
+    drag = null;
+    sheet.classList.remove("is-dragging");
+    backdrop.classList.remove("is-dragging");
+    if (handle.hasPointerCapture(e.pointerId)) handle.releasePointerCapture(e.pointerId);
+    const total = drawerLayer.clientHeight || 1;
+    const current = sheet.offsetHeight / total * 100;
+    if (!d.moved) {
+      paint(PCT[snap]);
+      return;
+    }
+    const first = d.samples[0], last = d.samples[d.samples.length - 1];
+    const dt = last.t - first.t;
+    const velocity = dt > 0 ? (last.y - first.y) / dt : 0;
+    let next;
+    if (Math.abs(velocity) > VELOCITY_THRESHOLD) {
+      next = velocity > 0 ? current > PCT.half ? "half" : "closed" : current < PCT.half ? "half" : "full";
+    } else if (current >= SNAP_FULL_ABOVE) next = "full";
+    else if (current <= SNAP_CLOSE_BELOW) next = "closed";
+    else next = "half";
+    if (next === "closed") {
+      closePanels();
+      return;
+    }
+    snap = next;
+    paint(PCT[next]);
+  }
+  handle.addEventListener("pointerup", endDrag);
+  handle.addEventListener("pointercancel", endDrag);
+
+  // src/components/menuSheet.ts
+  var ANIMATION_MS2 = 300;
+  var VELOCITY_THRESHOLD2 = 0.5;
+  var MIN_DRAG_DISTANCE = 5;
+  var CLOSE_THRESHOLD = 30;
+  var backdrop2 = h("div", { class: "ep-sheet-backdrop" });
+  var content = h("div", { class: "ep-sheet-content" });
+  var handle2 = h("div", { class: "ep-sheet-handle", "aria-hidden": "true" }, h("div", { class: "ep-drawer-grip" }));
+  var sheet2 = h("div", { class: "ep-menu-sheet", role: "dialog", "aria-modal": "true" }, handle2, content);
+  var menuSheetLayer = h("div", { class: "ep-sheet-layer" }, backdrop2, sheet2);
+  var visible3 = false;
+  var hideTimer2 = 0;
+  var token = 0;
+  function paint2(open) {
+    sheet2.style.transform = open ? "translateY(0)" : "translateY(100%)";
+    backdrop2.style.opacity = open ? "1" : "0";
+  }
+  function show2() {
+    if (hideTimer2) {
+      window.clearTimeout(hideTimer2);
+      hideTimer2 = 0;
+      paint2(true);
+      return;
+    }
+    if (visible3) return;
+    visible3 = true;
+    menuSheetLayer.classList.add("is-visible");
+    paint2(false);
+    void sheet2.offsetHeight;
+    const t = ++token;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (t === token && visible3) paint2(true);
+    }));
+  }
+  function hide2(immediate) {
+    if (!visible3) return;
+    token++;
+    const finish = () => {
+      hideTimer2 = 0;
+      visible3 = false;
+      menuSheetLayer.classList.remove("is-visible");
+      content.replaceChildren();
+    };
+    if (immediate) {
+      window.clearTimeout(hideTimer2);
+      finish();
+      return;
+    }
+    paint2(false);
+    if (!hideTimer2) hideTimer2 = window.setTimeout(finish, ANIMATION_MS2);
+  }
+  function syncMenuSheet(active) {
+    const menu = active && S.menu ? sheetMenu() : null;
+    if (!menu) {
+      hide2(!active);
+      return;
+    }
+    content.replaceChildren(menu);
+    show2();
+  }
+  var close = () => update(() => {
+    S.menu = null;
+  });
+  backdrop2.addEventListener("click", close);
+  var drag2 = null;
+  handle2.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0 || !visible3) return;
+    drag2 = { id: e.pointerId, startY: e.clientY, startT: performance.now(), height: sheet2.offsetHeight || 1, offset: 0, moved: false };
+    handle2.setPointerCapture(e.pointerId);
+    sheet2.classList.add("is-dragging");
+    e.preventDefault();
+  });
+  handle2.addEventListener("pointermove", (e) => {
+    if (!drag2 || e.pointerId !== drag2.id) return;
+    const dy = e.clientY - drag2.startY;
+    if (Math.abs(dy) >= MIN_DRAG_DISTANCE) drag2.moved = true;
+    drag2.offset = Math.max(0, dy);
+    sheet2.style.transform = `translateY(${drag2.offset}px)`;
+  });
+  function endDrag2(e) {
+    if (!drag2 || e.pointerId !== drag2.id) return;
+    const d = drag2;
+    drag2 = null;
+    sheet2.classList.remove("is-dragging");
+    if (handle2.hasPointerCapture(e.pointerId)) handle2.releasePointerCapture(e.pointerId);
+    if (!d.moved) {
+      paint2(true);
+      return;
+    }
+    const percent = d.offset / d.height * 100;
+    const dt = performance.now() - d.startT;
+    const velocity = dt > 0 ? d.offset / dt : 0;
+    if (percent > CLOSE_THRESHOLD || velocity > VELOCITY_THRESHOLD2) close();
+    else paint2(true);
+  }
+  handle2.addEventListener("pointerup", endDrag2);
+  handle2.addEventListener("pointercancel", endDrag2);
+
+  // src/enforce.ts
+  var MODES = ["view", "annotate", "shapes", "insert", "form", "redact"];
+  var PANEL_CMD = { search: "panel:toggle-search", comment: "panel:toggle-comment", style: "panel:toggle-annotation-style", redaction: "panel:toggle-redaction" };
+  function enforceFeatures() {
+    if (!isEnabled(`mode:${S.mode}`)) {
+      const next = MODES.find((m) => isEnabled(`mode:${m}`));
+      if (next) S.mode = next;
+      S.tool = null;
+    }
+    if (S.tool && !isEnabled(S.tool)) S.tool = null;
+    if (S.right && !isEnabled(PANEL_CMD[S.right])) S.right = null;
+    if (S.leftOpen && !isEnabled("panel:toggle-sidebar")) S.leftOpen = false;
+    if (S.leftTab === "thumbnails" && !categoryEnabled("sidebar-thumbnails")) S.leftTab = "outline";
+    if (S.leftTab === "outline" && !categoryEnabled("sidebar-outline")) S.leftTab = "thumbnails";
+    if (S.menu && !menuAvailable(S.menu)) S.menu = null;
+    if (S.modal === "print" && !isEnabled("document:print")) S.modal = null;
+    if (S.modal === "protect" && !isEnabled("document:protect")) S.modal = null;
+    if (S.modal === "signature" && !isEnabled("insert:add-signature")) S.modal = null;
   }
 
   // src/components/modals.ts
-  function frame(title, body, footer2) {
+  function frame(title, body2, footer2) {
     return h(
       "div",
       { class: "ep-modal-backdrop", "data-act": "modal-backdrop" },
@@ -1632,7 +2197,7 @@
           h("h2", {}, title),
           h("button", { type: "button", class: "ep-btn", "aria-label": "Close", "data-act": "modal-close" }, icon("x", { size: 20 }))
         ),
-        h("div", { class: "ep-dialog-content" }, body, footer2)
+        h("div", { class: "ep-dialog-content" }, body2, footer2)
       )
     );
   }
@@ -1652,7 +2217,7 @@
   }
   function printModal() {
     const d = doc();
-    const body = h(
+    const body2 = h(
       "div",
       { class: "ep-form" },
       h(
@@ -1670,10 +2235,10 @@
       ),
       h("label", { class: "ep-check-line" }, h("input", { type: "checkbox", checked: S.print.annotations, "data-in": "print-ann" }), h("span", {}, "Include annotations"))
     );
-    return frame("Print Settings", body, footer("Print", "print-do", S.print.busy));
+    return frame("Print Settings", body2, footer("Print", "print-do", S.print.busy));
   }
   function protectModal() {
-    const body = h(
+    const body2 = h(
       "div",
       { class: "ep-form" },
       h("label", { class: "ep-check-line" }, h("input", { type: "checkbox", checked: S.protect.openPw, "data-in": "protect-open" }), h("span", {}, "Require a password to open")),
@@ -1685,10 +2250,10 @@
         ...["Printing", "Copying text", "Editing", "Annotating"].map((p) => h("label", { class: "ep-check-line" }, h("input", { type: "checkbox", checked: true }), h("span", {}, `Allow ${p.toLowerCase()}`)))
       ) : null
     );
-    return frame("Document Security", body, footer("Apply", "protect-do"));
+    return frame("Document Security", body2, footer("Apply", "protect-do"));
   }
   function signatureModal() {
-    const body = h(
+    const body2 = h(
       "div",
       { class: "ep-form" },
       h(
@@ -1699,21 +2264,21 @@
       ),
       h("div", { class: "ep-sig-preview", id: "sig-preview" }, S.sigText || "Signature")
     );
-    return frame("Add Signature", body, footer("Create", "sig-do"));
+    return frame("Add Signature", body2, footer("Create", "sig-do"));
   }
 
   // src/components/tooltip.ts
   function setupTooltips(root2) {
     let timer2;
     let bubble = null;
-    const hide = () => {
+    const hide3 = () => {
       window.clearTimeout(timer2);
       bubble == null ? void 0 : bubble.remove();
       bubble = null;
     };
     root2.addEventListener("mouseover", (e) => {
       const el = e.target.closest("[data-tip]");
-      hide();
+      hide3();
       if (!el || el.disabled) return;
       timer2 = window.setTimeout(() => {
         bubble = document.createElement("div");
@@ -1726,9 +2291,9 @@
         bubble.style.top = `${r.bottom + 6}px`;
       }, 450);
     });
-    root2.addEventListener("mouseout", hide);
-    root2.addEventListener("pointerdown", hide);
-    root2.addEventListener("scroll", hide, true);
+    root2.addEventListener("mouseout", hide3);
+    root2.addEventListener("pointerdown", hide3);
+    root2.addEventListener("scroll", hide3, true);
   }
 
   // src/actions.ts
@@ -1775,10 +2340,10 @@
         });
         break;
       case "tab-close":
-        update(() => closeDoc(arg));
+        if (isEnabled("document:close")) update(() => closeDoc(arg));
         break;
       case "tab-add":
-        openDocFromPicker();
+        if (isEnabled("document:open")) openDocFromPicker();
         break;
       case "left-tab":
         update(() => {
@@ -1819,8 +2384,10 @@
         const c2 = d == null ? void 0 : d.comments.find((x) => x.id === arg);
         if (c2) update(() => {
           var _a2;
+          const wasSelected = !!c2.annId && S.selected === c2.annId;
           goToPage(c2.page);
           S.selected = (_a2 = c2.annId) != null ? _a2 : null;
+          if (!wasSelected && categoryEnabled("comment-reply") && matchMedia("(pointer: fine)").matches) S.focusKey = `reply-${c2.id}`;
         });
         break;
       }
@@ -1830,6 +2397,7 @@
         });
         break;
       case "comment-edit":
+        if (!categoryEnabled("comment-edit")) break;
         update(() => {
           S.editingComment = arg;
           S.commentMenu = null;
@@ -1843,19 +2411,31 @@
         break;
       case "comment-save": {
         const ta = document.querySelector('textarea[data-in="comment-text"]');
-        const c2 = d == null ? void 0 : d.comments.find((x) => x.id === arg);
+        const found = findEntry(d, arg);
         update(() => {
-          if (c2 && ta && ta.value.trim()) c2.text = ta.value.trim();
+          if (found && ta && ta.value.trim()) found.item.text = ta.value.trim();
           S.editingComment = null;
         });
         break;
       }
+      case "noop":
+        break;
+      // clicks inside the reply form must not select the card
+      case "reply-send":
+        sendReply(arg);
+        break;
       case "comment-delete": {
-        const c2 = d == null ? void 0 : d.comments.find((x) => x.id === arg);
+        if (!categoryEnabled("comment-delete")) break;
+        const found = findEntry(d, arg);
         update(() => {
-          if (!d || !c2) return;
-          if (c2.annId) removeAnn(d, c2.annId);
-          else d.comments = d.comments.filter((x) => x.id !== arg);
+          var _a2;
+          if (!d || !found) return;
+          if (found.parent) found.parent.replies = ((_a2 = found.parent.replies) != null ? _a2 : []).filter((x) => x.id !== arg);
+          else {
+            const c2 = found.item;
+            if (c2.annId) removeAnn(d, c2.annId);
+            else d.comments = d.comments.filter((x) => x.id !== arg);
+          }
           S.commentMenu = null;
         });
         break;
@@ -1925,8 +2505,33 @@
         break;
     }
   }
-  function onInput(e) {
+  function findEntry(d, id) {
     var _a;
+    if (!d) return null;
+    for (const c2 of d.comments) {
+      if (c2.id === id) return { item: c2, parent: null };
+      const r = (_a = c2.replies) == null ? void 0 : _a.find((x) => x.id === id);
+      if (r) return { item: r, parent: c2 };
+    }
+    return null;
+  }
+  function sendReply(id) {
+    var _a, _b;
+    const d = doc();
+    const c2 = d == null ? void 0 : d.comments.find((x) => x.id === id);
+    if (!d || !c2 || !categoryEnabled("comment-reply")) return;
+    const input = document.querySelector(`input[data-in="reply-text"][data-arg="${id}"]`);
+    const text = ((_b = (_a = input == null ? void 0 : input.value) != null ? _a : S.replyDraft[id]) != null ? _b : "").trim();
+    if (!text) return;
+    update(() => {
+      var _a2;
+      ((_a2 = c2.replies) != null ? _a2 : c2.replies = []).push({ id: uid("r"), author: "You", date: today(), text, color: "bg-blue" });
+      delete S.replyDraft[id];
+      S.focusKey = `reply-${id}`;
+    });
+  }
+  function onInput(e) {
+    var _a, _b;
     const el = e.target;
     const key = (_a = el.getAttribute) == null ? void 0 : _a.call(el, "data-in");
     if (!key) return;
@@ -1936,6 +2541,13 @@
       if (n) n.textContent = text;
     };
     switch (key) {
+      case "reply-text": {
+        const id = el.getAttribute("data-arg");
+        S.replyDraft[id] = el.value;
+        const btn = (_b = el.parentElement) == null ? void 0 : _b.querySelector(".ep-reply-send");
+        if (btn) btn.disabled = !el.value.trim();
+        return;
+      }
       case "search-q":
         S.search.q = el.value;
         S.search.active = 0;
@@ -2035,7 +2647,10 @@
           S.menu = null;
           S.commentMenu = null;
         } else if (S.editingComment) S.editingComment = null;
-        else if (S.selected) S.selected = null;
+        else if (useDrawerMode() && (S.leftOpen || S.right)) {
+          S.leftOpen = false;
+          S.right = null;
+        } else if (S.selected) S.selected = null;
         else if (S.tool || S.pointerTool !== "pointer") {
           S.tool = null;
           S.pointerTool = "pointer";
@@ -2048,6 +2663,9 @@
       if (e.key === "Enter" && (key === "zoom" || key === "page")) {
         e.preventDefault();
         onChange(e);
+      } else if (e.key === "Enter" && key === "reply-text") {
+        e.preventDefault();
+        sendReply(t.getAttribute("data-arg"));
       } else if (e.key === "Enter" && key === "search-q" && d) {
         e.preventDefault();
         update(() => showHit(d, S.search.active + (e.shiftKey ? -1 : 1)));
@@ -2061,7 +2679,7 @@
     const mod = e.ctrlKey || e.metaKey;
     if (mod && e.key.toLowerCase() === "f") {
       e.preventDefault();
-      update(() => {
+      if (isEnabled("panel:toggle-search")) update(() => {
         S.right = "search";
         S.focusKey = "search";
       });
@@ -2087,8 +2705,8 @@
   }
 
   // src/interactions.ts
-  var drag = null;
-  var hideTimer;
+  var drag3 = null;
+  var hideTimer3;
   var pageEl = (n) => document.querySelector(`.ep-page[data-page="${n}"]`);
   function toPage(e, el) {
     const r = el.getBoundingClientRect();
@@ -2102,8 +2720,8 @@
     const el = document.querySelector(".ep-overlay");
     if (!el) return;
     el.classList.add("is-visible");
-    window.clearTimeout(hideTimer);
-    hideTimer = window.setTimeout(() => el.classList.remove("is-visible"), 2500);
+    window.clearTimeout(hideTimer3);
+    hideTimer3 = window.setTimeout(() => el.classList.remove("is-visible"), 2500);
   }
   function syncPageUI() {
     const d = doc();
@@ -2228,7 +2846,7 @@
     const t = e.target;
     const ae = document.activeElement;
     if ((ae == null ? void 0 : ae.isContentEditable) && !t.closest('[contenteditable="true"]')) ae.blur();
-    if ((S.menu || S.commentMenu) && !t.closest(".ep-menu") && !t.closest("[data-menu-trigger]")) {
+    if ((S.menu || S.commentMenu) && !t.closest(".ep-menu") && !t.closest(".ep-menu-sheet") && !t.closest("[data-menu-trigger]")) {
       S.menu = null;
       S.commentMenu = null;
       update();
@@ -2240,7 +2858,7 @@
     if (!d) return;
     const el = t.closest(".ep-page");
     if (S.pointerTool === "pan") {
-      drag = { kind: "pan", x: e.clientX, y: e.clientY, sl: vp.scrollLeft, st: vp.scrollTop, vp };
+      drag3 = { kind: "pan", x: e.clientX, y: e.clientY, sl: vp.scrollLeft, st: vp.scrollTop, vp };
       (_a = document.querySelector(".ep-root")) == null ? void 0 : _a.classList.add("panning");
       e.preventDefault();
       return;
@@ -2250,7 +2868,7 @@
       const box = document.createElement("div");
       box.className = "ep-marquee";
       wrap.appendChild(box);
-      drag = { kind: "marquee", x0: e.clientX, y0: e.clientY, el: box, wrap };
+      drag3 = { kind: "marquee", x0: e.clientX, y0: e.clientY, el: box, wrap };
       e.preventDefault();
       return;
     }
@@ -2263,7 +2881,7 @@
       if (def.drag) {
         const ann = create(page, def, p);
         if (def.type === "ink" || def.type === "inkhl") ann.pts = [[p.x, p.y]];
-        drag = { kind: "draw", def, page, start: p, ann };
+        drag3 = { kind: "draw", def, page, start: p, ann };
       } else placeClickTool(S.tool, def, page, p);
       return;
     }
@@ -2272,7 +2890,7 @@
     if (annEl && el) {
       const id = annEl.getAttribute("data-ann");
       const page = Number(el.getAttribute("data-page"));
-      drag = { kind: "move", id, page, last: toPage(e, el), moved: false };
+      drag3 = { kind: "move", id, page, last: toPage(e, el), moved: false };
       if (S.selected !== id) update(() => {
         S.selected = id;
       });
@@ -2284,19 +2902,19 @@
   }
   function onMove(e) {
     var _a;
-    if (!drag) return;
-    if (drag.kind === "pan") {
-      drag.vp.scrollLeft = drag.sl - (e.clientX - drag.x);
-      drag.vp.scrollTop = drag.st - (e.clientY - drag.y);
-    } else if (drag.kind === "marquee") {
-      const r = drag.wrap.getBoundingClientRect();
-      const x = Math.min(e.clientX, drag.x0) - r.left, y = Math.min(e.clientY, drag.y0) - r.top;
-      Object.assign(drag.el.style, { left: `${x}px`, top: `${y}px`, width: `${Math.abs(e.clientX - drag.x0)}px`, height: `${Math.abs(e.clientY - drag.y0)}px` });
-    } else if (drag.kind === "draw") {
-      const el = pageEl(drag.page);
+    if (!drag3) return;
+    if (drag3.kind === "pan") {
+      drag3.vp.scrollLeft = drag3.sl - (e.clientX - drag3.x);
+      drag3.vp.scrollTop = drag3.st - (e.clientY - drag3.y);
+    } else if (drag3.kind === "marquee") {
+      const r = drag3.wrap.getBoundingClientRect();
+      const x = Math.min(e.clientX, drag3.x0) - r.left, y = Math.min(e.clientY, drag3.y0) - r.top;
+      Object.assign(drag3.el.style, { left: `${x}px`, top: `${y}px`, width: `${Math.abs(e.clientX - drag3.x0)}px`, height: `${Math.abs(e.clientY - drag3.y0)}px` });
+    } else if (drag3.kind === "draw") {
+      const el = pageEl(drag3.page);
       if (!el) return;
       const p = toPage(e, el);
-      const a = drag.ann, s2 = drag.start;
+      const a = drag3.ann, s2 = drag3.start;
       if (a.type === "ink" || a.type === "inkhl") {
         a.pts.push([p.x, p.y]);
         Object.assign(a, bboxOf(a.pts));
@@ -2304,18 +2922,18 @@
         a.pts = [[s2.x, s2.y], [p.x, p.y]];
         Object.assign(a, bboxOf(a.pts));
       } else Object.assign(a, { x: Math.min(s2.x, p.x), y: Math.min(s2.y, p.y), w: Math.abs(p.x - s2.x), h: Math.abs(p.y - s2.y) });
-      repaintLayer(drag.page, a);
-    } else if (drag.kind === "move") {
-      const d = doc(), el = pageEl(drag.page);
-      const moveId = drag.id;
+      repaintLayer(drag3.page, a);
+    } else if (drag3.kind === "move") {
+      const d = doc(), el = pageEl(drag3.page);
+      const moveId = drag3.id;
       const a = d == null ? void 0 : d.anns.find((x) => x.id === moveId);
       if (!d || !el || !a) return;
       const p = toPage(e, el);
-      const dx = p.x - drag.last.x, dy = p.y - drag.last.y;
-      if (!drag.moved) {
+      const dx = p.x - drag3.last.x, dy = p.y - drag3.last.y;
+      if (!drag3.moved) {
         if (Math.abs(dx) + Math.abs(dy) < 2e-3) return;
         pushHistory(d);
-        drag.moved = true;
+        drag3.moved = true;
       }
       a.x += dx;
       a.y += dy;
@@ -2323,15 +2941,15 @@
         q[0] += dx;
         q[1] += dy;
       });
-      drag.last = p;
-      repaintLayer(drag.page);
+      drag3.last = p;
+      repaintLayer(drag3.page);
     }
   }
   function onUp(e) {
     var _a;
-    if (!drag) return;
-    const dr = drag;
-    drag = null;
+    if (!drag3) return;
+    const dr = drag3;
+    drag3 = null;
     (_a = document.querySelector(".ep-root")) == null ? void 0 : _a.classList.remove("panning");
     if (dr.kind === "marquee") {
       const rect = dr.el.getBoundingClientRect();
@@ -2386,6 +3004,7 @@
       const d = doc();
       if (!vp || !d) return;
       e.preventDefault();
+      if (!categoryEnabled("zoom")) return;
       update(() => {
         var _a, _b;
         return setZoom(e.deltaY < 0 ? (_a = ZOOMS.find((z) => z > d.zoom)) != null ? _a : 1600 : (_b = [...ZOOMS].reverse().find((z) => z < d.zoom)) != null ? _b : 25);
@@ -2424,15 +3043,28 @@
     const focusKey = ae && root.contains(ae) ? (_a = ae.getAttribute) == null ? void 0 : _a.call(ae, "data-focus") : null;
     const sel = focusKey ? { s: ae.selectionStart, e: ae.selectionEnd } : null;
     const d = doc();
+    enforceFeatures();
+    const mobile = useDrawerMode();
+    normalizePanels(mobile);
     const classes = ["ep-root"];
+    if (isMobileWidth()) classes.push("is-mobile");
     if (S.pointerTool === "pan") classes.push("tool-pan");
     if (S.pointerTool === "marquee") classes.push("tool-marquee");
     if (S.tool && TOOLS[S.tool] && !S.fillMode) classes.push("tool-draw");
     root.className = classes.join(" ");
-    const content = d ? h("div", { class: "ep-content" }, S.leftOpen ? leftSidebar(d) : null, h("div", { class: "ep-main" }, viewport()), S.right ? rightSidebar(d) : null) : h("div", { class: "ep-content" }, h("div", { class: "ep-main" }, emptyState()));
+    const content2 = d ? h("div", { class: "ep-content" }, !mobile && S.leftOpen ? leftSidebar(d) : null, h("div", { class: "ep-main" }, viewport()), !mobile && S.right ? rightSidebar(d) : null) : h("div", { class: "ep-content" }, h("div", { class: "ep-main" }, emptyState()));
     const modal = S.modal === "print" && d ? printModal() : S.modal === "protect" ? protectModal() : S.modal === "signature" ? signatureModal() : null;
-    const parts = [tabBar(), d ? mainToolbar() : null, d ? secondaryToolbar() : null, content, modal];
-    root.replaceChildren(...parts.filter((n) => n !== null));
+    const parts = [tabBar(), d ? mainToolbar() : null, d ? secondaryToolbar() : null, content2, modal];
+    Array.from(root.children).forEach((c2) => {
+      if (c2 !== drawerLayer && c2 !== menuSheetLayer) c2.remove();
+    });
+    const anchor2 = drawerLayer.parentNode === root ? drawerLayer : null;
+    parts.forEach((n) => {
+      if (n) root.insertBefore(n, anchor2);
+    });
+    if (!anchor2) root.append(drawerLayer, menuSheetLayer);
+    syncDrawer(d, mobile);
+    syncMenuSheet(useSheetMode());
     const pending = S.pending;
     S.pending = null;
     root.querySelectorAll("[data-scroll]").forEach((el) => {
@@ -2488,4 +3120,12 @@
   setupTooltips(root);
   setupInteractions(root);
   render();
+  var wasMobile = isMobileWidth();
+  new ResizeObserver(() => {
+    const m = isMobileWidth();
+    if (m !== wasMobile) {
+      wasMobile = m;
+      update();
+    }
+  }).observe(root);
 })();

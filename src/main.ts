@@ -1,9 +1,13 @@
 import { h } from './dom';
-import { S, doc, initDocs, setRenderer } from './state';
+import { S, doc, initDocs, setRenderer, update } from './state';
 import { TOOLS } from './annotations';
 import { tabBar } from './components/tabBar';
 import { mainToolbar, secondaryToolbar } from './components/toolbar';
 import { leftSidebar, rightSidebar } from './components/sidebars';
+import { drawerLayer, normalizePanels, syncDrawer } from './components/drawer';
+import { menuSheetLayer, syncMenuSheet } from './components/menuSheet';
+import { isMobileWidth, useDrawerMode, useSheetMode } from './config';
+import { enforceFeatures } from './enforce';
 import { viewport, emptyState } from './components/viewport';
 import { printModal, protectModal, signatureModal } from './components/modals';
 import { setupTooltips } from './components/tooltip';
@@ -26,19 +30,30 @@ function render(): void {
 
   // ── build ──
   const d = doc();
+  enforceFeatures();
+  const mobile = useDrawerMode();
+  normalizePanels(mobile);
   const classes = ['ep-root'];
+  if (isMobileWidth()) classes.push('is-mobile');
   if (S.pointerTool === 'pan') classes.push('tool-pan');
   if (S.pointerTool === 'marquee') classes.push('tool-marquee');
   if (S.tool && TOOLS[S.tool] && !S.fillMode) classes.push('tool-draw');
   root.className = classes.join(' ');
 
   const content = d
-    ? h('div', { class: 'ep-content' }, S.leftOpen ? leftSidebar(d) : null, h('div', { class: 'ep-main' }, viewport()), S.right ? rightSidebar(d) : null)
+    ? h('div', { class: 'ep-content' }, !mobile && S.leftOpen ? leftSidebar(d) : null, h('div', { class: 'ep-main' }, viewport()), !mobile && S.right ? rightSidebar(d) : null)
     : h('div', { class: 'ep-content' }, h('div', { class: 'ep-main' }, emptyState()));
 
   const modal = S.modal === 'print' && d ? printModal() : S.modal === 'protect' ? protectModal() : S.modal === 'signature' ? signatureModal() : null;
   const parts: (Node | null)[] = [tabBar(), d ? mainToolbar() : null, d ? secondaryToolbar() : null, content, modal];
-  root.replaceChildren(...parts.filter((n): n is Node => n !== null));
+  // The mobile drawer shell must survive re-renders (otherwise its slide transition never runs),
+  // so replace everything except the drawer and menu-sheet layers.
+  Array.from(root.children).forEach((c) => { if (c !== drawerLayer && c !== menuSheetLayer) c.remove(); });
+  const anchor = drawerLayer.parentNode === root ? drawerLayer : null;
+  parts.forEach((n) => { if (n) root.insertBefore(n, anchor); });
+  if (!anchor) root.append(drawerLayer, menuSheetLayer);
+  syncDrawer(d, mobile);
+  syncMenuSheet(useSheetMode());
 
   // ── restore ──
   const pending = S.pending;
@@ -97,3 +112,10 @@ document.addEventListener('keydown', onKeydown);
 setupTooltips(root);
 setupInteractions(root);
 render();
+
+// Cross the mobile breakpoint (rotate / resize): switch between inline sidebars and the bottom drawer.
+let wasMobile = isMobileWidth();
+new ResizeObserver(() => {
+  const m = isMobileWidth();
+  if (m !== wasMobile) { wasMobile = m; update(); }
+}).observe(root);

@@ -2,13 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>PDF Viewer UI Demo</title>
   <link rel="stylesheet" href="css/theme.css" />
   <link rel="stylesheet" href="css/viewer.css" />
 </head>
 <body>
   <div id="pdf-viewer"></div>
+  <!-- Optional: switch features off / tune mobile UI before the bundle loads (see README).
+  <script>
+    window.PDF_VIEWER_CONFIG = { disabledCategories: ['print', 'security'] };
+  </script>
+  -->
   <script src="dist/app.js"></script>
 </body>
 </html>

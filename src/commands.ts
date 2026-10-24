@@ -1,6 +1,7 @@
 import { S, ZOOMS, doc, update, undo, redo, pushHistory, uid, newDoc, Mode, RightPanel } from './state';
 import { TOOLS } from './annotations';
 import { toast } from './components/toast';
+import { isEnabled } from './features';
 
 export const MODE_DEFAULT_TOOL: Record<Mode, string | null> = {
   view: null, annotate: 'annotation:add-highlight', shapes: 'annotation:add-rectangle',
@@ -77,6 +78,8 @@ export function isActive(id: string): boolean {
     case 'left-action-menu:overflow-menu': return !!S.menu && S.menu.startsWith('left');
     case 'tabs:overflow-menu': return S.menu === 'tabs';
     case 'annotation:overflow-tools': return S.menu === 'annot-more';
+    case 'annotation:overflow-shapes': return S.menu === 'shapes-more';
+    case 'form:overflow-tools': return S.menu === 'forms-more';
     case 'form:toggle-fill-mode': return S.fillMode;
     case 'spread:none': case 'spread:odd': case 'spread:even': return S.spread === id.split(':')[1];
     case 'scroll:vertical': return S.layout === 'vertical';
@@ -104,11 +107,12 @@ export function isDisabled(id: string): boolean {
 const MENU_TOGGLES: Record<string, string> = {
   'document:menu': 'document', 'page:settings': 'page', 'zoom:toggle-menu': 'zoom', 'zoom:toggle-menu-mobile': 'zoom',
   'left-action-menu:overflow-menu': 'left', 'tabs:overflow-menu': 'tabs', 'annotation:overflow-tools': 'annot-more',
+  'annotation:overflow-shapes': 'shapes-more', 'form:overflow-tools': 'forms-more',
 };
 
 export function execute(id: string): void {
   const d = doc();
-  if (isDisabled(id)) return;
+  if (!isEnabled(id) || isDisabled(id)) return;
 
   if (MENU_TOGGLES[id]) { update(() => { const m = S.menu, t = MENU_TOGGLES[id]; S.menu = m === t || (t === 'left' && !!m?.startsWith('left')) || (t === 'zoom' && !!m?.startsWith('zoom')) ? null : t; }); return; }
 

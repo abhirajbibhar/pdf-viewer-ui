@@ -1,9 +1,11 @@
 import { h } from '../dom';
-import { commandButton, tabButton, divider, spacer, anchor } from './buttons';
+import { commandButton, tabButton, divider, spacer, anchor, tidy } from './buttons';
+import { categoryEnabled } from '../features';
 import { menuIf } from './menus';
 import { S, doc } from '../state';
 
-function zoomToolbar(): HTMLElement {
+function zoomToolbar(): HTMLElement | null {
+  if (!categoryEnabled('zoom')) return null;
   const d = doc();
   return h('div', { class: 'ep-zoom hide-lt-768' },
     h('div', { class: 'ep-zoom-inner' },
@@ -15,9 +17,10 @@ function zoomToolbar(): HTMLElement {
       commandButton('zoom:in')));
 }
 
-function modeSelect(): HTMLElement {
+function modeSelect(): HTMLElement | null {
   const label = S.mode.charAt(0).toUpperCase() + S.mode.slice(1);
   const btn = commandButton('tabs:overflow-menu');
+  if (!btn) return null;
   btn.className = 'ep-btn ep-mode-select' + (S.menu === 'tabs' ? ' is-active' : '');
   btn.replaceChildren(h('span', { class: 'ep-mode-select-label' }, label));
   btn.insertAdjacentHTML('beforeend', '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6l6 -6"/></svg>');
@@ -25,7 +28,7 @@ function modeSelect(): HTMLElement {
 }
 
 export function mainToolbar(): HTMLElement {
-  return h('div', { class: 'ep-toolbar ep-toolbar-main', role: 'toolbar' },
+  return tidy(h('div', { class: 'ep-toolbar ep-toolbar-main', role: 'toolbar' },
     h('div', { class: 'ep-group' },
       anchor(commandButton('document:menu'), menuIf('document')),
       divider(),
@@ -46,12 +49,15 @@ export function mainToolbar(): HTMLElement {
       tabButton('mode:insert', 'hide-lt-1024'), tabButton('mode:form', 'hide-lt-1024'), tabButton('mode:redact', 'hide-lt-1024'),
       anchor(commandButton('tabs:overflow-menu', { className: 'hide-gte-1024' }), menuIf('tabs'), 'hide-gte-1024')),
     spacer(),
-    h('div', { class: 'ep-group' }, commandButton('panel:toggle-search'), commandButton('panel:toggle-comment')));
+    h('div', { class: 'ep-group' }, commandButton('panel:toggle-search'), commandButton('panel:toggle-comment'))));
 }
 
-const history = (): HTMLElement[] => [commandButton('history:undo'), commandButton('history:redo')];
-const sec = (items: (Node | null)[]): HTMLElement =>
-  h('div', { class: 'ep-toolbar ep-toolbar-secondary', role: 'toolbar' }, spacer(), h('div', { class: 'ep-group' }, items), spacer());
+const history = (): (HTMLElement | null)[] => [commandButton('history:undo'), commandButton('history:redo')];
+const sec = (items: (Node | null)[]): HTMLElement | null => {
+  const bar = h('div', { class: 'ep-toolbar ep-toolbar-secondary', role: 'toolbar' }, spacer(), h('div', { class: 'ep-group' }, items), spacer());
+  tidy(bar);
+  return bar.querySelector('.ep-group') ? bar : null; // nothing left in this mode -> no empty toolbar
+};
 
 export function secondaryToolbar(): HTMLElement | null {
   const style = commandButton('panel:toggle-annotation-style');
@@ -66,12 +72,16 @@ export function secondaryToolbar(): HTMLElement | null {
       ]);
     case 'shapes':
       return sec([
-        ...['rectangle', 'circle', 'line', 'arrow', 'polygon', 'polyline'].map((t) => commandButton(`annotation:add-${t}`)),
+        ...['rectangle', 'circle', 'line', 'arrow'].map((t) => commandButton(`annotation:add-${t}`)),
+        ...['polygon', 'polyline'].map((t) => commandButton(`annotation:add-${t}`, { className: 'hide-lt-640' })),
+        anchor(commandButton('annotation:overflow-shapes', { className: 'show-lt-640' }), menuIf('shapes-more'), 'show-lt-640'),
         divider(), style, divider(), ...history(),
       ]);
     case 'form':
       return sec([
-        ...['textfield', 'checkbox', 'radio', 'select', 'listbox'].map((t) => commandButton(`form:add-${t}`)),
+        ...['textfield', 'checkbox', 'radio'].map((t) => commandButton(`form:add-${t}`)),
+        ...['select', 'listbox'].map((t) => commandButton(`form:add-${t}`, { className: 'hide-lt-640' })),
+        anchor(commandButton('form:overflow-tools', { className: 'show-lt-640' }), menuIf('forms-more'), 'show-lt-640'),
         divider(), style, commandButton('form:toggle-fill-mode'), divider(), ...history(),
       ]);
     case 'insert':

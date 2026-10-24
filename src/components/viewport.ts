@@ -3,6 +3,7 @@ import { icon } from '../icon';
 import { commandButton } from './buttons';
 import { buildLayer } from '../annotations';
 import { findHits, Hit } from '../content';
+import { categoryEnabled, isEnabled } from '../features';
 import { BASE_PAGE_W, Doc, PAGE_RATIO, S, doc } from '../state';
 
 export const hitsFor = (d: Doc): Hit[] => findHits(d.content, S.search.q, S.search.matchCase, S.search.wholeWord);
@@ -64,7 +65,8 @@ export function viewport(): HTMLElement {
     pageControls(d));
 }
 
-function pageControls(d: Doc): HTMLElement {
+function pageControls(d: Doc): HTMLElement | null {
+  if (!categoryEnabled('navigation')) return null;
   return h('div', { class: 'ep-overlay ep-overlay-bottom-center' },
     h('div', { class: 'ep-page-controls' },
       commandButton('scroll:previous-page'),
@@ -80,6 +82,6 @@ export function emptyState(): HTMLElement {
       h('div', { class: 'ep-empty-icon' }, icon('file', { size: 48 })),
       h('h2', { class: 'ep-empty-title' }, 'No Documents Open'),
       h('p', { class: 'ep-empty-desc' }, 'Open a PDF document to get started.', h('br'), 'You can view multiple documents using tabs.'),
-      h('button', { type: 'button', class: 'ep-primary-btn', 'data-act': 'tab-add' }, icon('plus', { size: 16 }), 'Open Document'),
+      isEnabled('document:open') ? h('button', { type: 'button', class: 'ep-primary-btn', 'data-act': 'tab-add' }, icon('plus', { size: 16 }), 'Open Document') : null,
       h('p', { class: 'ep-empty-hint' }, 'Supported format: PDF')));
 }

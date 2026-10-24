@@ -3,13 +3,16 @@ import { icon } from '../icon';
 import { skeletonPage } from './page';
 import { hitsFor } from './viewport';
 import { buildOutline, OutlineNode } from '../content';
-import { Ann, Cmt, Doc, S, doc } from '../state';
+import { Ann, Cmt, Doc, Reply, S, doc } from '../state';
+import { categoryEnabled } from '../features';
 import { TOOLS, TYPE_LABEL, defaultFor } from '../annotations';
 
 // ───────── left sidebar ─────────
-function segmented(): HTMLElement {
+function segmented(): HTMLElement | null {
   const tab = (id: 'thumbnails' | 'outline', ic: string, cls: string) =>
     h('button', { type: 'button', role: 'tab', 'aria-selected': S.leftTab === id, class: `ep-seg ${cls}${S.leftTab === id ? ' is-active' : ''}`, 'data-tip': id === 'thumbnails' ? 'Thumbnails' : 'Outline', 'data-act': 'left-tab', 'data-arg': id }, icon(ic, { size: 20 }));
+  const tabs = [categoryEnabled('sidebar-thumbnails') ? 'thumbnails' : null, categoryEnabled('sidebar-outline') ? 'outline' : null].filter(Boolean);
+  if (tabs.length < 2) return null; // a single tab needs no switcher
   return h('div', { class: 'ep-seg-group', role: 'tablist' }, tab('thumbnails', 'squares', 'first'), tab('outline', 'listTree', 'last'));
 }
 
@@ -77,29 +80,63 @@ function searchPanel(d: Doc): HTMLElement {
 }
 
 // ───────── comments ─────────
+const avatar = (name: string, color: string): HTMLElement => h('div', { class: `ep-avatar ${color}` }, name.charAt(0).toUpperCase());
+
+/** The "⋯" button + its Edit / Delete popup. Works for comments and replies (ids are unique). */
+function itemMenu(id: string): HTMLElement | null {
+  const canEdit = categoryEnabled('comment-edit'), canDelete = categoryEnabled('comment-delete');
+  if (!canEdit && !canDelete) return null;
+  return h('div', { class: 'ep-anchor' },
+    h('button', { type: 'button', class: 'ep-card-menu', 'aria-label': 'Menu', 'data-act': 'comment-menu', 'data-arg': id, 'data-menu-trigger': '1' }, icon('dots', { size: 16 })),
+    S.commentMenu === id
+      ? h('div', { class: 'ep-menu ep-menu-small', role: 'menu' },
+          canEdit ? h('button', { type: 'button', class: 'ep-menu-item', 'data-act': 'comment-edit', 'data-arg': id }, h('span', { class: 'ep-menu-label' }, 'Edit')) : null,
+          canDelete ? h('button', { type: 'button', class: 'ep-menu-item', 'data-act': 'comment-delete', 'data-arg': id }, h('span', { class: 'ep-menu-label' }, 'Delete')) : null)
+      : null);
+}
+
+function editForm(id: string, text: string): HTMLElement {
+  return h('div', { class: 'ep-card-edit' },
+    h('textarea', { class: 'ep-textarea', rows: 3, 'data-focus': 'comment-edit', 'data-in': 'comment-text', 'data-arg': id }, text),
+    h('div', { class: 'ep-card-edit-actions' },
+      h('button', { type: 'button', class: 'ep-secondary-btn ep-sm', 'data-act': 'comment-cancel' }, 'Cancel'),
+      h('button', { type: 'button', class: 'ep-primary-btn ep-sm', 'data-act': 'comment-save', 'data-arg': id }, 'Save')));
+}
+
+function replyItem(r: Reply): HTMLElement {
+  const editing = S.editingComment === r.id;
+  return h('div', { class: 'ep-reply' },
+    avatar(r.author, r.color),
+    h('div', { class: 'ep-card-main' },
+      h('div', { class: 'ep-card-head' },
+        h('div', { class: 'ep-card-author' }, h('h5', {}, r.author), h('span', {}, r.date)),
+        itemMenu(r.id)),
+      editing ? editForm(r.id, r.text) : h('p', { class: 'ep-card-text' }, r.text)));
+}
+
+/** "Add reply" field + send button (always shown under a comment, like EmbedPDF's AnnotationInput). */
+function replyForm(c: Cmt): HTMLElement {
+  const draft = S.replyDraft[c.id] ?? '';
+  return h('div', { class: 'ep-reply-form', 'data-act': 'noop' },
+    h('input', { type: 'text', class: 'ep-reply-field', placeholder: 'Add reply', value: draft, 'aria-label': 'Add reply', autocomplete: 'off', 'data-in': 'reply-text', 'data-arg': c.id, 'data-focus': `reply-${c.id}` }),
+    h('button', { type: 'button', class: 'ep-reply-send', 'aria-label': 'Send reply', 'data-act': 'reply-send', 'data-arg': c.id, ...(draft.trim() ? {} : { disabled: true }) }, icon('send', { size: 20 })));
+}
+
 function commentCard(c: Cmt): HTMLElement {
   const editing = S.editingComment === c.id;
   const selected = !!c.annId && S.selected === c.annId;
+  const replies = c.replies ?? [];
   return h('div', { class: `ep-card${selected ? ' is-selected' : ''}`, 'data-act': 'comment-go', 'data-arg': c.id },
     h('div', { class: 'ep-card-body' },
-      h('div', { class: `ep-avatar ${c.color}` }, c.author.charAt(0).toUpperCase()),
-      h('div', { class: 'ep-card-main' },
-        h('div', { class: 'ep-card-head' },
-          h('div', { class: 'ep-card-author' }, h('h4', {}, c.author), h('span', {}, c.date)),
-          h('div', { class: 'ep-anchor' },
-            h('button', { type: 'button', class: 'ep-card-menu', 'aria-label': 'Menu', 'data-act': 'comment-menu', 'data-arg': c.id, 'data-menu-trigger': '1' }, icon('dots', { size: 16 })),
-            S.commentMenu === c.id
-              ? h('div', { class: 'ep-menu ep-menu-small', role: 'menu' },
-                  h('button', { type: 'button', class: 'ep-menu-item', 'data-act': 'comment-edit', 'data-arg': c.id }, h('span', { class: 'ep-menu-label' }, 'Edit')),
-                  h('button', { type: 'button', class: 'ep-menu-item', 'data-act': 'comment-delete', 'data-arg': c.id }, h('span', { class: 'ep-menu-label' }, 'Delete')))
-              : null)),
-        editing
-          ? h('div', { class: 'ep-card-edit' },
-              h('textarea', { class: 'ep-textarea', rows: 3, 'data-focus': 'comment-edit', 'data-in': 'comment-text', 'data-arg': c.id }, c.text),
-              h('div', { class: 'ep-card-edit-actions' },
-                h('button', { type: 'button', class: 'ep-secondary-btn ep-sm', 'data-act': 'comment-cancel' }, 'Cancel'),
-                h('button', { type: 'button', class: 'ep-primary-btn ep-sm', 'data-act': 'comment-save', 'data-arg': c.id }, 'Save')))
-          : h('p', { class: 'ep-card-text' }, c.text))));
+      h('div', { class: 'ep-card-row' },
+        avatar(c.author, c.color),
+        h('div', { class: 'ep-card-main' },
+          h('div', { class: 'ep-card-head' },
+            h('div', { class: 'ep-card-author' }, h('h4', {}, c.author), h('span', {}, c.date)),
+            itemMenu(c.id)),
+          editing ? editForm(c.id, c.text) : h('p', { class: 'ep-card-text' }, c.text))),
+      replies.length ? h('div', { class: 'ep-reply-list' }, replies.map(replyItem)) : null,
+      categoryEnabled('comment-reply') && !editing ? replyForm(c) : null));
 }
 
 function commentPanel(d: Doc): HTMLElement {

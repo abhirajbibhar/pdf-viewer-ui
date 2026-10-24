@@ -37,6 +37,9 @@ Export, screenshot and printing only show a toast, and nothing is saved anywhere
 
 ```
 index.html
+src/config.ts        feature switches + mobile options (edit DEFAULT_CONFIG)
+src/features.ts      command categories (print, annotation, ...) and enable checks
+src/enforce.ts       resets state that points at a disabled feature
 css/theme.css        colour tokens
 css/viewer.css       styles
 src/state.ts         central state + history
@@ -45,6 +48,68 @@ src/actions.ts       click / input / keyboard handlers
 src/interactions.ts  pointer drawing, pan, marquee, scroll tracking
 src/annotations.ts   annotation model + SVG/HTML layer renderer
 src/content.ts       generated page text, outline, search
-src/components/      tabBar, toolbar, menus, sidebars, viewport, modals, toast, tooltip
+src/components/      drawer (mobile sidebar drawer), menuSheet (mobile menu sheet), tabBar, toolbar, menus, sidebars, viewport, modals, toast, tooltip
 src/icons.ts         SVG icons extracted from the original components
 ```
+
+## Mobile UI (container width < 768px)
+
+Mirrors EmbedPDF's native behaviour: instead of side panels and dropdowns, the viewer uses bottom sheets.
+
+- **Sidebar drawer** (`components/drawer.ts`): thumbnails / outline, search, comments, annotation styles and redactions slide up
+  from the bottom with a backdrop and a drag handle. Snap points: closed / half / full (velocity + position based).
+- **Menu sheet** (`components/menuSheet.ts`): document, page, zoom and mode menus slide up, wrap their content (max 80%),
+  show a back arrow + title for submenus and are dismissed by dragging down, tapping the backdrop, or Esc.
+
+- **Toolbar overflow** (< 640px): Annotate keeps its core tools and moves the rest into a "⋯" menu; Shapes moves polygon / polyline and Forms moves select / listbox the same way (opens as a bottom sheet).
+- **Dialogs** (print / protect / signature) are full-screen on mobile and a centered card on desktop.
+- **Touch / notch:** `viewport-fit=cover` + safe-area padding; drawing, pan and marquee tools disable page scrolling while active; sheets don't scroll-chain into the page; Esc closes the drawer.
+
+Both shells are created once and kept across `render()` calls, otherwise the slide transition could never run.
+
+## Enabling / disabling features
+
+Edit `DEFAULT_CONFIG` in `src/config.ts`, or set it from the page before the bundle loads:
+
+```html
+<script>
+  window.PDF_VIEWER_CONFIG = {
+    disabledCategories: ['print', 'security', 'open', 'close', 'annotation'],
+    mobile: { menuSheet: true, sidebarDrawer: true, drawer: { initialSnap: 'half', resizable: true } },
+  };
+</script>
+<script src="dist/app.js"></script>
+```
+
+Quick test without editing anything: `index.html#disable=print,security`.
+
+Disabling a category removes every button, menu item, keyboard shortcut and panel that belongs to it (children included);
+empty menus, section titles and stray dividers disappear with it.
+
+| Category (alias) | What goes away |
+| --- | --- |
+| `document` | whole document menu · `document-open` (`open`) · `document-close` (`close`) · `document-print` (`print`) · `document-protect` / `security` · `document-export` (`export`) · `document-capture` (`screenshot`) · `document-fullscreen` |
+| `mode-view` (`view`) | the View tab · `mode-annotate` · `mode-shapes` · `mode-insert` · `mode-form` · `mode-redact` |
+| `annotation` | Annotate + Shapes modes and all markup / ink / text / shape tools · finer: `annotation-markup`, `annotation-ink`, `annotation-text`, `annotation-shape`, `annotation-comment` |
+| `form` / `insert` / `redaction` | that mode and its tools (`insert-signature`, `insert-image`, `form-fill-mode`, ...) |
+| `panel-sidebar` (`sidebar`) · `sidebar-thumbnails` · `sidebar-outline` | left sidebar and its tabs |
+| `panel-search` (`search`) · `panel-comment` (`comments`) · `panel-annotation-style` · `panel-redaction` | right-hand panels (and Ctrl+F) |
+| `comment-reply` (`replies`) · `comment-edit` · `comment-delete` | the "Add reply" field · entries in a comment's / reply's menu |
+| `zoom` | zoom toolbar, zoom menu, Ctrl+wheel · finer: `zoom-in`, `zoom-out`, `zoom-level`, `zoom-fit-page`, `zoom-fit-width`, `zoom-marquee` |
+| `page` | page menu · `spread`, `rotate`, `scroll`, `navigation` (the prev / next / page-number pill) |
+| `tools` | pan + pointer · `history` (`undo`, `redo`) |
+| `tab-bar` (`tabs`) | the document tab strip |
+
+Mobile options: `mobile.breakpoint`, `mobile.sidebarDrawer` (false = inline sidebars), `mobile.menuSheet` (false = dropdowns),
+`mobile.drawer.initialSnap` (`'half'` / `'full'`) and `mobile.drawer.resizable`.
+
+### Document tab bar
+
+`ui.tabBar` controls the strip of open documents: `'always'` (default), `'auto'` (only when two or more documents are open,
+so single-book reading gets the full height) or `'never'`. Quick test: `index.html#tabs=auto`. `disabledCategories: ['tab-bar']`
+is the same as `'never'`. With the strip hidden, documents are still opened / closed from the document menu.
+
+### Comment replies
+
+Every comment has a reply thread and an "Add reply" field (Enter or the send button). Replies have the same Edit / Delete menu as comments.
+Unsent text survives re-renders. Selecting a comment focuses its reply field on desktop (not on touch devices, to avoid popping the keyboard).
